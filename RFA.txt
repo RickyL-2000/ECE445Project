@@ -1,0 +1,48 @@
+**REQUEST FOR APPROVAL**
+
+**PROJECT: Assistive Lighting Robot**
+
+**PROBLEM**
+
+Stage lighting engineers are important in scenarios like theater, concert, and live houses. They use all kinds of lamps and lights and related equipment to perform artistic lighting to achieve all kinds of stage effects. However, the present stage lighting requires tedious programing, and the presented effects are not very "fascinating". Sometimes, DJs and performers want to present some improvisational movements of the lights or want the lights to move to the rhythm of the music, or just want to guide the audience's lightstick movement. The preprogrammed and rigid lighting show cannot meet this requirement.
+
+**SOLUTION OVERVIEW**
+
+This project aims to build a wearable man-machine integration lighting command system. An operator (mostly a presenter or DJ) wears (or holds) this control device on their hands. This wearable device tracks the movement of the operator's arms, transmitting the direction information to the mounted projector light array. The projector lights will simulate the direction of the arms of the operator. Besides, the whole system can memorize the movement mode and playback. Additionally, the color of the lights can be manually determined or be automatically predicted by the rhythm and temper of the music being played.
+
+**SOLUTION COMPONENT**
+
+Control Device
+
+1. Inertial sensor: track the change of direction.
+2. Wireless communication module: communicate with the mounted lighting array.
+3. Mode switch: switch between different modes (regular, playback, etc.) and control the calibration.
+4. (optional) the movement of the operator can be recognized by computer vision.
+
+Mounted Light Array
+
+1. Mounted motor base with 2 degrees of freedom.
+2. A regular projector light.
+3. Wireless communication module.
+4. (optional) The colors of the lights can also be determined by the rhythm of the music in a real-time manner.
+
+**CRITERION FOR SUCCESS**
+
+The movement of the arms of the operator can be successfully simulated by the mounted lighting array. If lucky, the colors of the lights can also be determined by the rhythm of the music in a real-time manner.
+
+
+# 机械部分
+## 校准
+## 影子模式
+## 回放模式
+
+# 惯性部分
+
+# 通信部分
+
+# 音乐部分
+## 手动颜色模式
+## 随动模式
+
+
+
