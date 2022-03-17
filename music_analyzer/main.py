@@ -27,19 +27,21 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
     M = librosa.power_to_db(M, ref=np.max)
     librosa.display.specshow(M, y_axis='mel', x_axis='time', hop_length=hop_length, ax=ax[0])
     ax[0].set_xlim(begin, end)
+    ax[0].set_xlabel('')    # cancel x label
+    ax[0].set_title("Mel Spectrogram")
 
     # waveform
     t = np.arange(begin, end, 1 / fs)
     ax[1].plot(t, y_, label='waveform')
+    ax[1].set_xlabel('TIME')
     ax[1].vlines(times[beats], 0, 1, color='r', linestyles='--', label='beat')
-
     # energy
     energy = librosa.feature.rms(y_, frame_length=2048, hop_length=hop_length)[0]
     times = librosa.times_like(energy, sr=fs, hop_length=hop_length) + begin
     ax[1].plot(times, energy, color='y', label='energy')
     ax[1].set_xlim(begin, end)
-
     ax[1].legend()
+    ax[1].set_title("Waveform Feature")
 
     # color map
     color_map = np.zeros_like(energy)
@@ -53,10 +55,10 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
     color_map = np.convolve(color_map, np.ones(8) / 8, mode='same')  # filter
     color_matrix = np.tile(color_map, (int(color_map.shape[0] / 4), 1))
     ax[2].imshow(color_matrix, cmap='hsv')
+    ax[2].set_title("Color Sequence")
 
     plt.show()
 
-# %%
 plot_beats(y, fs, begin=0, end=10, hop_length=512)
 
 # %%
