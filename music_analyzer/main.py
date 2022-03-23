@@ -52,8 +52,9 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
     beat_soft = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
     color_map += energy + 0.3 * beat_soft
     color_map /= np.max(color_map)
-    color_map = np.convolve(color_map, np.ones(8) / 8, mode='same')  # filter
+    color_map = np.convolve(color_map, np.ones(16) / 16, mode='same')  # filter
     color_matrix = np.tile(color_map, (int(color_map.shape[0] / 4), 1))
+    color_matrix = 1 - color_matrix
     ax[2].imshow(color_matrix, cmap='hsv')
     ax[2].set_title("Color Sequence")
 
