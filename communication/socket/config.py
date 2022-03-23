@@ -1,0 +1,10 @@
+
+ESP_IP="192.168.31.123"
+PC_IP="192.168.31.177"
+BOARDCAST_IP="0.0.0.0"
+
+PORT=9999
+
+BUFFER_SIZE=1024
+
+BACKLOG = 5 # 监听套接字, 最多允许backlog个连接
