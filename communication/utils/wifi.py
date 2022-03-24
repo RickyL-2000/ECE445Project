@@ -6,8 +6,10 @@ import network
 
 # WIFI_SSID = "RICKY"
 # PASSWD = "RICKY2000"
-WIFI_SSID = "nichousha"
-PASSWD = "chounizadi"
+# WIFI_SSID = "nichousha"
+# PASSWD = "chounizadi"
+WIFI_SSID = "HAOZHE-Mi10S"
+PASSWD = "411411411"
 
 wifi = network.WLAN(network.STA_IF)
 
