@@ -130,9 +130,15 @@ plt.show()
 
 # %%
 # try convolve beat sequence
+plt.figure(figsize=(9, 4))
 beat_sequence_ = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
 plt.vlines(times[beats], 0, 1, color='r', linestyles='--', label='beat')
-plt.plot(times, beat_sequence_)
+plt.plot(times, beat_sequence_, label='smoothed beat')
+plt.legend()
+plt.show()
+
+# %%
+plt.plot(times, np.hamming(times.shape[0]), lw=6)
 plt.show()
 
 # %%
