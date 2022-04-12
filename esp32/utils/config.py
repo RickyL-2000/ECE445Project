@@ -1,0 +1,18 @@
+
+ESP_IP="192.168.31.123"
+PC_IP="192.168.31.177"
+BOARDCAST_IP="0.0.0.0"
+
+PORT=8880
+
+BUFFER_SIZE=4
+
+BACKLOG = 5 # 监听套接字, 最多允许backlog个连接
+
+
+# WIFI_SSID = "RICKY"
+# PASSWD = "RICKY2000"
+WIFI_SSID = "nichousha"
+PASSWD = "chounizadi"
+# WIFI_SSID = "HAOZHE-Mi10S"
+# PASSWD = "411411411"
