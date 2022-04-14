@@ -2,3 +2,4 @@ __pycache__
 .vscode
 .idea
 pymakr.conf
+esp-idf-water/
