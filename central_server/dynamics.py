@@ -1,8 +1,6 @@
 from utils.channel import Channel
-import utils.log as log
 from utils.config import PC_IP, DYNAMICS_PORT
 import numpy as np
-import queue
 
 THETA_RANGE = 360
 THETA_REMAP = 240
@@ -32,9 +30,7 @@ class Dynamics:
         return theta, phi
     
     def temporal_remap(self,theta,phi):
-        
-        
-        
+        pass
 
 
 if __name__ == "__main__":
