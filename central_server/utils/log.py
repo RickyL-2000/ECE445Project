@@ -1,4 +1,4 @@
-from color import *
+from utils.color import *
 
 def log(s,level):
     print()

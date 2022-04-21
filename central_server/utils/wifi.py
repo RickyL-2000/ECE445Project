@@ -3,16 +3,9 @@ import time
 import log
 import blink
 import network
-
-# WIFI_SSID = "RICKY"
-# PASSWD = "RICKY2000"
-# WIFI_SSID = "nichousha"
-# PASSWD = "chounizadi"
-WIFI_SSID = "HAOZHE-Mi10S"
-PASSWD = "411411411"
+from utils.config import WIFI_SSID,PASSWD
 
 wifi = network.WLAN(network.STA_IF)
-
 
 def blink_connect():
     blink.blink_sec(0.1, 10)

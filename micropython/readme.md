@@ -22,28 +22,24 @@ Communication subsystem
 ## Diractory structure
 
 ```
-communication
-│  boot.py     # executable script, runs only once when booted or resetted
-│  main.py     # executable script, runs always runs after boot.py (go interact CLI after return)
-│  readme.md   # this file
+esp32
+│  boot.py           # executable script, runs only once when booted or resetted
+│  main.py           # executable script, runs always runs after boot.py (go interact CLI after return)
+│  readme.md         # this file
+│  unittest_PC_client.py
+│  unittest_PC_server.py
 │
-├─log    # where log file is stored
-├─socket
-│  │  client.py      # ESP32 client
-│  │  config.py      # basic configure information for socket, like ip, port...
-│  │  PC_client.py   # pc socket client
-│  │  PC_server.py   # pc socket server
-│  │  server.py      # ESP32 server
-│  └─ __init__.py    # python package initialization file. Uniformly add system path
-│
-└─utils
+├─log       # log files
+└─utils     # utils
     │  blink.py      # onboard LED utils, used for indication and debug
+    │  channel.py    # communication class
     │  color.py      # pretty color for unix-like system CLI
+    │  config.py     # config file for communication and other utils
     │  log.py        # unified log functions, for both CLI and logfile
     │  uart.py       # serial port communication between ESP and PC
     │  wifi.py       # basic wifi functions
-    └─ __init__.py   # python package initialization file. Uniformly add system path
-    
+    └─ __init__.py
+
 ```
 
 
