@@ -5,12 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import os
+import sys
 
 from utils import *
 
 # %%
 f_path = os.path.join("audios", "GALA - Young For You.mp3")
-y, fs = load_audio(f_path)
+# y, fs = load_audio(f_path)
+
+base_dir = 'D:/OneDrive - International Campus, Zhejiang University/08_2022_SPRING/ECE445/ECE445Project/music_analyzer'
 
 # %%
 def plot_beats(y, fs, begin=0, end=10, hop_length=512):
@@ -26,7 +29,8 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
     M = librosa.feature.melspectrogram(y=y_, sr=fs, hop_length=hop_length)
     M = librosa.power_to_db(M, ref=np.max)
     librosa.display.specshow(M, y_axis='mel', x_axis='time', hop_length=hop_length, ax=ax[0])
-    ax[0].set_xlim(begin, end)
+    # ax[0].set_xlim(begin, end)
+    # ax[0].set_xticks(np.arange(0, end-begin, (end-begin)/5), labels=list(np.arange(begin, end, (end-begin)/5)))
     ax[0].set_xlabel('')    # cancel x label
     ax[0].set_title("Mel Spectrogram")
 
@@ -50,9 +54,9 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
     beat_gap = 60 / tempo * fs / hop_length
     energy /= np.max(energy)
     beat_soft = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
-    color_map += energy + 0.3 * beat_soft
+    color_map += energy + 0.6 * beat_soft
     color_map /= np.max(color_map)
-    color_map = np.convolve(color_map, np.ones(16) / 16, mode='same')  # filter
+    color_map = np.convolve(color_map, np.ones(32) / 32, mode='same')  # filter
     color_matrix = np.tile(color_map, (int(color_map.shape[0] / 4), 1))
     color_matrix = 1 - color_matrix
     ax[2].imshow(color_matrix, cmap='hsv')
@@ -60,7 +64,54 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
 
     plt.show()
 
-plot_beats(y, fs, begin=0, end=10, hop_length=512)
+# plot_beats(y, fs, begin=10, end=20, hop_length=512)
+
+
+# %%
+def main(f_path, fs, hop_length=512):
+    # f_path = os.path.join("audios", "GALA - Young For You.mp3")
+    y, fs = load_audio(f_path, fs)
+
+    # beat tracking
+    onset_env = librosa.onset.onset_strength(y, fs, aggregate=np.median)
+    tempo, beats = librosa.beat.beat_track(onset_envelope=onset_env, sr=fs, hop_length=hop_length)
+    times = librosa.times_like(onset_env, sr=fs, hop_length=hop_length)
+
+    # energy
+    energy = librosa.feature.rms(y, frame_length=2048, hop_length=hop_length)[0]
+
+    # color map
+    hue_map = np.zeros_like(energy)
+    value_map = np.zeros_like(energy)
+    beat_sequence = np.zeros_like(energy)
+    beat_sequence[beats] = 1.0
+    beat_gap = 60 / tempo * fs / hop_length
+    energy /= np.max(energy)
+    beat_soft = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
+    hue_map += energy + 0.6 * beat_soft
+    hue_map = np.convolve(hue_map, np.ones(32) / 32, mode='same')  # filter
+    hue_map /= np.max(hue_map)
+    # hue_map = np.convolve(hue_map, np.ones(32) / 32, mode='same')  # filter
+    hue_map *= 360
+    value_map += energy + 1 * beat_soft
+    value_map = np.convolve(value_map, np.ones(32) / 32, mode='same')  # filter
+    value_map /= np.max(value_map)
+    # value_map = np.convolve(value_map, np.ones(32) / 32, mode='same')  # filter
+
+    r, g, b = hsv2rgb(hue_map, np.ones_like(hue_map), value_map)
+
+    with open(base_dir + "/output.txt", "w") as f:
+        f.write(f"{fs / hop_length:.2f}\n")
+        for i in range(r.shape[0]):
+            f.write(f"{int(r[i])} {int(g[i])} {int(b[i])}\n")
+
+# %%
+if __name__ == "__main__":
+    main(f_path=f_path, fs=22050, hop_length=512)
+    output2C(base_dir)
+
+# %%
+sys.exit()
 
 # %%
 begin = 0
@@ -188,3 +239,42 @@ color_matrix = np.tile(color_map, (int(color_map.shape[0] / 4), 1))
 ax[2].imshow(color_matrix, aspect='auto', cmap='hsv')
 
 plt.show()
+
+# %% try output
+
+y, fs = load_audio(f_path, fs)
+
+y = y[int(0 * fs): int(10 * fs)]
+
+hop_length = 512
+
+# beat tracking
+onset_env = librosa.onset.onset_strength(y, fs, aggregate=np.median)
+tempo, beats = librosa.beat.beat_track(onset_envelope=onset_env, sr=fs, hop_length=hop_length)
+times = librosa.times_like(onset_env, sr=fs, hop_length=hop_length)
+
+# energy
+energy = librosa.feature.rms(y, frame_length=2048, hop_length=hop_length)[0]
+
+# color map
+hue_map = np.zeros_like(energy)
+value_map = np.zeros_like(energy)
+beat_sequence = np.zeros_like(energy)
+beat_sequence[beats] = 1.0
+beat_gap = 60 / tempo * fs / hop_length
+energy /= np.max(energy)
+beat_soft = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
+hue_map += energy + 0.6 * beat_soft
+hue_map /= np.max(hue_map)
+hue_map = np.convolve(hue_map, np.ones(32) / 32, mode='same')  # filter
+hue_map *= 360
+value_map += energy + 0.3 * beat_soft
+value_map = value_map / np.max(value_map) * 0.4 + 0.6
+value_map = np.convolve(value_map, np.ones(32) / 32, mode='same')  # filter
+
+r, g, b = hsv2rgb(hue_map, np.ones_like(hue_map), value_map)
+
+with open(base_dir + "/output.txt", "w") as f:
+    f.write(f"{fs / hop_length:.2f}\n")
+    for i in range(r.shape[0]):
+        f.write(f"{int(r[i])} {int(g[i])} {int(b[i])}\n")
