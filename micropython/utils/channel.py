@@ -51,6 +51,11 @@ class Channel:
         finally:
             return self.connected
 
+    def close(self):
+
+        self.s.shutdown(socket.SHUT_WR)
+        
+        self.s.close()
 
     def listen(self):
         if not self.is_server:
@@ -89,12 +94,13 @@ class Channel:
 
     def send(self, msg):
         s = json.dumps(msg).encode("utf-8")
-        slen = struct.pack(">L", len(s))
+        slen = struct.pack("<L", len(s))
         
         if not self.connected:
             self.connect_to_server()
         
         try:
+            # self.s.send(s)
             self.s.send(slen + s)
             log.info("send to {}: {}".format(self.server_host,msg))
         except:

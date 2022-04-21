@@ -1,10 +1,14 @@
 
 import utils.log as log
 from utils.channel import Channel
-from utils.config import ESP_IP, PC_IP, BOARDCAST_IP, PORT
+import time
+import socket
+
+bala = "abcdefghijklmnopqrstuvwxyz"
 
 if __name__=="__main__":
     c = Channel("CentralClient")
-    c.becomeClient(ESP_IP, PORT)
+    c.becomeClient("192.168.31.7", 12345)
     for i in range(10):
-        c.send("msg"+str(i))
+        c.send("msg"+str(i)+": "+bala*10*abs(i-5))
+    c.close()
