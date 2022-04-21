@@ -55,3 +55,42 @@ def load_audio(f_path, fs=22050, filter_warnings=True):
     if len(y.shape) > 1 and y.shape[0] > 1:     # multi-channel
         y = librosa.to_mono(y)
     return y, fs
+
+def hsv2rgb(h: np.ndarray, s: np.ndarray, v: np.ndarray):
+    h60 = h / 60
+    h60f = np.floor(h60)
+    hi = h60f % 6
+    f = h60 - h60f
+    p = v * (1 - s)
+    q = v * (1 - f * s)
+    t = v * (1 - (1 - f) * s)
+    r, g, b = np.zeros_like(h), np.zeros_like(h), np.zeros_like(h)
+    for i in range(h.shape[0]):
+        if hi[i] == 0:
+            r[i], g[i], b[i] = v[i], t[i], p[i]
+        elif hi[i] == 1:
+            r[i], g[i], b[i] = q[i], v[i], p[i]
+        elif hi[i] == 2:
+            r[i], g[i], b[i] = p[i], v[i], t[i]
+        elif hi[i] == 3:
+            r[i], g[i], b[i] = p[i], q[i], v[i]
+        elif hi[i] == 4:
+            r[i], g[i], b[i] = t[i], p[i], v[i]
+        elif hi[i] == 5:
+            r[i], g[i], b[i] = v[i], p[i], q[i]
+    return r*255, g*255, b*255
+
+def output2C(base_dir, length=400):
+    R, G, B = [], [], []
+    with open(base_dir + '/output.txt') as f:
+        fs = float(f.readline().strip())
+        for i in range(length):
+            r, g, b = f.readline().strip().split()
+            R.append(r)
+            G.append(g)
+            B.append(b)
+    outputC = f"unsigned char R[{length}] = {{{', '.join(R)}}};\n" \
+              f"unsigned char G[{length}] = {{{', '.join(G)}}};\n" \
+              f"unsigned char B[{length}] = {{{', '.join(B)}}};\n"
+    with open(base_dir + '/outputC.txt', 'w') as f:
+        f.write(outputC)

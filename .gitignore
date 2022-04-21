@@ -4,3 +4,4 @@ __pycache__
 pymakr.conf
 esp-idf-water/
 build/
+cmake-build-debug/
