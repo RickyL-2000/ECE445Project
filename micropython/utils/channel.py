@@ -25,6 +25,8 @@ class Channel:
         self.recv_callback = recv_callback
         self.s = socket.socket()  # 创建套接字
 
+        self.connections = {}
+
         self.is_server = True
         self.s.bind((self.local_host, self.local_port))  # 绑定地址和端口号
         self.s.listen(BACKLOG)  # 监听套接字, 最多允许backlog个连接
@@ -65,10 +67,17 @@ class Channel:
         while True:
             log.info("accepting.....")
             conn, addr = self.s.accept()  # 接收连接请求，返回收发数据的套接字对象和客户端地址
+            if addr[0] not in self.connections:
+                self.connections[addr[0]] = conn
+            else:
+                self.connections[addr[0]].close()
+                self.connections[addr[0]] = conn
+
             log.success("{} connected".format(addr))
             if CENTRAL_SERVER:
                 listen_t = Thread(target=self.client_listen,args=(conn,),daemon=True)
                 listen_t.start()
+                # self.client_listen(conn)
             else:
                 self.client_listen(conn)
 
@@ -78,22 +87,22 @@ class Channel:
                 chunk = conn.recv(BUFFER_SIZE)
                 if len(chunk) < BUFFER_SIZE:
                     break
-                slen = struct.unpack('>L', chunk)[0]
+                slen = struct.unpack('<L', chunk)[0]
                 chunk = conn.recv(slen)
                 while len(chunk) < slen:
                     chunk = chunk + conn.recv(slen - len(chunk))
-                obj = json.loads(chunk.decode("utf-8"))
+                obj = chunk.decode("ascii")
 
                 self.recv_callback(obj)
 
         except Exception as e:
             log.error(e)
-            self.s.close()
+            conn.close()
             log.error("server quit abnormally!")
             return
 
     def send(self, msg):
-        s = json.dumps(msg).encode("utf-8")
+        s = msg.encode("ascii")
         slen = struct.pack("<L", len(s))
         
         if not self.connected:

@@ -2,6 +2,7 @@
 #include "kalmanfilter.hpp"
 #include "wifi.h"
 #include "tcp_server.h"
+#include "tcp_client.hpp"
 
 #include "nvs_flash.h"
 
@@ -57,6 +58,15 @@ static void mpu6050_task(void *pvParameters) {
 
 }
 
+static void mytcp_client_task(void *pvParameters) {
+    TcpClient client;
+//    int i;
+    for (;;) {
+        client.send((char *)"this is message from esp32 mytcp client");
+        vTaskDelay(1000 / portTICK_RATE_MS);
+    }
+}
+
 extern "C" void app_main() {
     printf("app_main\n");
 
@@ -68,15 +78,17 @@ extern "C" void app_main() {
     }
     ESP_ERROR_CHECK(ret);
 
-    ESP_LOGI(WIFI_MODE_TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
 
-    TaskHandle_t tcp_server_handle = nullptr;
-    xTaskCreate(tcp_server_task, "tcp_server", 4096, (void *) AF_INET, 5, &tcp_server_handle);
+    TaskHandle_t mytcp_client_handle;
+    xTaskCreate(mytcp_client_task, "tcp_client", 4096, nullptr, 5, &mytcp_client_handle);
 
 
+//    TaskHandle_t tcp_server_handle;
+//    xTaskCreate(tcp_server_task, "tcp_server", 4096, (void *) AF_INET, 5, &tcp_server_handle);
 
 //    mpu6050_task((void *)"xx");
 //    xTaskCreatePinnedToCore(&mpu6050_task,"mpu6050_task",2048*2,NULL,5,NULL,0);
-//    xTaskCreate(mpu6050_task, "mpu6050_task", 4096, NULL, 3, NULL);
+//    TaskHandle_t mpu6050_handle;
+//    xTaskCreate(mpu6050_task, "mpu6050_task", 4096, NULL, 3, &mpu6050_handle);
 }
