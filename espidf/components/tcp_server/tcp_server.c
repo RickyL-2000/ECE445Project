@@ -4,12 +4,14 @@
 
 #include "tcp_server.h"
 
+static const char *TAG = "tcp_server";
+
 static void do_retransmit(const int sock)
 {
     int len;
     unsigned long slen;
-    char output_buffer[1024];
-    int buffer_size = sizeof(output_buffer);
+    char output_buffer[BUFFER_SIZE];
+    int buffer_size = BUFFER_SIZE;
 
     do {
         len = recv(sock, &slen, sizeof(slen), 0);
@@ -36,7 +38,6 @@ static void do_retransmit(const int sock)
             } else {
                 output_buffer[slen] = 0; // Null-terminate whatever is received and treat it like a string
                 ESP_LOGI(TAG, "Received %d bytes: %s", len, output_buffer);
-
             }
             
         }
@@ -61,15 +62,6 @@ void tcp_server_task(void *pvParameters)
         dest_addr_ip4->sin_port = htons(PORT);
         ip_protocol = IPPROTO_IP;
     }
-#ifdef CONFIG_EXAMPLE_IPV6
-    else if (addr_family == AF_INET6) {
-        struct sockaddr_in6 *dest_addr_ip6 = (struct sockaddr_in6 *)&dest_addr;
-        bzero(&dest_addr_ip6->sin6_addr.un, sizeof(dest_addr_ip6->sin6_addr.un));
-        dest_addr_ip6->sin6_family = AF_INET6;
-        dest_addr_ip6->sin6_port = htons(PORT);
-        ip_protocol = IPPROTO_IPV6;
-    }
-#endif
 
     int listen_sock = socket(addr_family, SOCK_STREAM, ip_protocol);
     if (listen_sock < 0) {
@@ -79,11 +71,6 @@ void tcp_server_task(void *pvParameters)
     }
     int opt = 1;
     setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-#if defined(CONFIG_EXAMPLE_IPV4) && defined(CONFIG_EXAMPLE_IPV6)
-    // Note that by default IPV6 binds to both protocols, it is must be disabled
-    // if both protocols used at the same time (used in CI)
-    setsockopt(listen_sock, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
-#endif
 
     ESP_LOGI(TAG, "Socket created");
 
@@ -122,11 +109,7 @@ void tcp_server_task(void *pvParameters)
         if (source_addr.ss_family == PF_INET) {
             inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
         }
-#ifdef CONFIG_EXAMPLE_IPV6
-        else if (source_addr.ss_family == PF_INET6) {
-            inet6_ntoa_r(((struct sockaddr_in6 *)&source_addr)->sin6_addr, addr_str, sizeof(addr_str) - 1);
-        }
-#endif
+
         ESP_LOGI(TAG, "Socket accepted ip address: %s", addr_str);
 
         do_retransmit(sock);

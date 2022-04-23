@@ -32,7 +32,7 @@
 #define KEEPALIVE_INTERVAL          3
 #define KEEPALIVE_COUNT             3
 
-static const char *TAG = "tcp_server";
+#define BUFFER_SIZE     1024
 
 #ifdef __cplusplus
 extern "C" {

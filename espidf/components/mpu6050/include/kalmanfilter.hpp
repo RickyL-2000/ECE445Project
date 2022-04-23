@@ -16,6 +16,6 @@ private:
     float pdot[4] = {0, 0, 0, 0};
     float pp[2][2] = {{1, 0}, {0, 1}};
 public:
-    KALMAN(float dt);
+    explicit KALMAN(float dt);
     float filter(float accel, float gyro);
 };
