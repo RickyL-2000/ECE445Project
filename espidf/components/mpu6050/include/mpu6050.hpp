@@ -30,7 +30,7 @@ private:
 public:
     MPU6050(gpio_num_t scl, gpio_num_t sda, i2c_port_t port);
     ~MPU6050();
-    bool init();
+    int init();
 
     float getAccX();
     float getAccY();

@@ -7,8 +7,6 @@
 
 #include <string.h>
 #include <sys/param.h>
-
-#include "freertos/queue.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -24,29 +22,20 @@
 
 #define PORT 12345
 
-struct msgWarp_t{
-    unsigned long slen;
-    char* msg;
-    int sock;
-};
-
 class TcpClient {
 private:
     int sock;
-    bool connected;
     static constexpr const char *host_ip = HOST_IP_ADDR;
     int addr_family;
     int ip_protocol;
     static constexpr const char *TAG = "tcp_client";
-
+    bool connected;
 public:
-    static QueueHandle_t tcpClientMsgQueue;
-
     TcpClient();
 
     int connect();
 
-    void send(char *msg);
+    int send(char *msg);
 
     ~TcpClient();
 };

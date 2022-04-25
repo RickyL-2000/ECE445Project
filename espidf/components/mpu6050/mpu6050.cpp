@@ -38,18 +38,18 @@ MPU6050::~MPU6050() {
     delete(i2c);
 }
 
-bool MPU6050::init() {
+int MPU6050::init() {
     if (!i2c -> slave_write(MPU6050_ADDR, PWR_MGMT_1  , 0x00))
-        return false;
+        return ESP_FAIL;
     if (!i2c -> slave_write(MPU6050_ADDR, SMPLRT_DIV  , 0x07))
-        return false;
+        return ESP_FAIL;
     if (!i2c -> slave_write(MPU6050_ADDR, CONFIG      , 0x07))
-        return false;
+        return ESP_FAIL;
     if (!i2c -> slave_write(MPU6050_ADDR, GYRO_CONFIG , 0x18))
-        return false;
+        return ESP_FAIL;
     if (!i2c -> slave_write(MPU6050_ADDR, ACCEL_CONFIG, 0x01))
-        return false;
-    return true;
+        return ESP_FAIL;
+    return ESP_OK;
 }
 
 float MPU6050::getAccX() {

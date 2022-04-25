@@ -5,7 +5,6 @@
 #include "tcp_client.hpp"
 
 TcpClient::TcpClient() {
-    tcpClientMsgQueue = xQueueCreate(10, sizeof(msgWarp_t));
     sock = 0;
     addr_family = 0;
     ip_protocol = 0;
@@ -20,16 +19,17 @@ TcpClient::~TcpClient() {
 }
 
 int TcpClient::connect() {
-    if (connected) {
-        if (shutdown(sock, 0) < 0) {
-            ESP_LOGE(TAG, "Failed to shutdown socket: errno %d", errno);
-        }
-        if (closesocket(sock) < 0) {
+    // The connected flag must be false when call the connect method.
+    assert(connected == false);
+    if (0!=sock){
+        int err;
+//        err = shutdown(sock,0);
+        err = closesocket(sock);
+        if (err<0){
             ESP_LOGE(TAG, "Failed to close socket: errno %d", errno);
         }
-        connected = false;
     }
-
+    
     struct sockaddr_in dest_addr = {
             .sin_family = AF_INET,
             .sin_port = htons(PORT),
@@ -45,7 +45,7 @@ int TcpClient::connect() {
         ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
         return errno;
     }
-    ESP_LOGI(TAG, "Socket created, try to connect to %s:%d", host_ip, PORT);
+    ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, PORT);
 
     int err = ::connect(sock, (struct sockaddr *) &dest_addr, sizeof(struct sockaddr_in6));
     if (err != 0) {
@@ -57,41 +57,27 @@ int TcpClient::connect() {
     return ESP_OK;
 }
 
-static void daemonSendService(void *pvParameter) {
-    char TAG[] = "tcp_client_daemon_send";
-    msgWarp_t *msgWarp;
-
-    for (;;) {
-        if (xQueueReceive(TcpClient::tcpClientMsgQueue, msgWarp, 100 / portTICK_PERIOD_MS) != pdPASS) {
-            ESP_LOGI(TAG, "msgWarp addr:%p, msgWarp.slen addr:%p, ", msgWarp, &(msgWarp->slen));
-
-            ESP_LOGI(TAG, "Send slen:%lu", msgWarp->slen);
-            if (::send(msgWarp->sock, &(msgWarp->slen), 4, 0) < 0) {
-                ESP_LOGE(TAG, "Error occurred during sending slen: errno %d", errno);
-                vTaskDelete(nullptr);
-            }
-
-            ESP_LOGI(TAG, "Send msg:%s", msgWarp->msg);
-            if (::send(msgWarp->sock, &(msgWarp->msg), msgWarp->slen, 0) < 0) {
-                ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-                vTaskDelete(nullptr);
-            }
-        }
+int TcpClient::send(char *msg) {
+    if(!connected){
+        return ESP_FAIL;
     }
-    vTaskDelete(nullptr);
-}
+    unsigned long slen = strlen(msg);
+    ESP_LOGI(TAG,"Send slen:%lu",slen);
+    if (::send(sock,&slen,4,0) < 0) {
+        connected = false;
+        ESP_LOGE(TAG, "Error occurred during sending slen: errno %d", errno);
+//        vTaskDelay(1000/portTICK_PERIOD_MS);
+        connect();
+        return errno;
+    }
 
-void TcpClient::send(char *msg) {
-    ESP_LOGI(TAG, "to %d: %s", sock, msg);
-    auto *msgWarp_p = (struct msgWarp_t *) malloc(sizeof(msgWarp_t));
-    msgWarp_p->slen = (unsigned long) strlen(msg);
-    msgWarp_p->msg = msg;
-    msgWarp_p->sock = sock;
-
-    ESP_LOGI(TAG, "strlen:%d, msgWarp_p.slen:%lu, sock:%d, msgWarp_p.sock:%d, ", (int) strlen(msg), msgWarp_p->slen, sock,
-             msgWarp_p->sock);
-    ESP_LOGI(TAG, "msgWarp_p addr:%p, msgWarp_p.slen addr:%p, ", &msgWarp_p, &(msgWarp_p->slen));
-
-    xQueueSend(tcpClientMsgQueue, msgWarp_p,100/portTICK_PERIOD_MS);
-
+    ESP_LOGI(TAG,"Send msg:%s",msg);
+    if (::send(sock, msg, slen, 0) < 0) {
+        connected = false;
+        ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+//        vTaskDelay(1000/portTICK_PERIOD_MS);
+        connect();
+        return errno;
+    }
+    return ESP_OK;
 }

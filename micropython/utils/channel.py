@@ -67,17 +67,15 @@ class Channel:
         while True:
             log.info("accepting.....")
             conn, addr = self.s.accept()  # 接收连接请求，返回收发数据的套接字对象和客户端地址
-            if addr[0] not in self.connections:
-                self.connections[addr[0]] = conn
-            else:
-                self.connections[addr[0]].close()
-                self.connections[addr[0]] = conn
-
             log.success("{} connected".format(addr))
             if CENTRAL_SERVER:
-                listen_t = Thread(target=self.client_listen,args=(conn,),daemon=True)
-                listen_t.start()
-                # self.client_listen(conn)
+                if addr[0] not in self.connections:
+                    self.connections[addr[0]] = conn
+                else:
+                    self.connections[addr[0]].close()
+                    self.connections[addr[0]] = conn
+                listen_p = Thread(target=self.client_listen,args=(conn,),daemon=True)
+                listen_p.start()
             else:
                 self.client_listen(conn)
 

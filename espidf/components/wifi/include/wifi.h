@@ -11,10 +11,6 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-/* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t s_wifi_event_group;
-
-
 #define EXAMPLE_ESP_WIFI_SSID      "nichousha"
 #define EXAMPLE_ESP_WIFI_PASS      "chounizadi"
 #define EXAMPLE_ESP_MAXIMUM_RETRY  5
