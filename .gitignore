@@ -5,3 +5,7 @@ pymakr.conf
 esp-idf-water/
 build/
 cmake-build-debug/
+
+# dataset
+cal500data
+emotifymusic
