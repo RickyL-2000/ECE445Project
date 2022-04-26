@@ -1,7 +1,5 @@
 #include "mpu6050.hpp"
-#include "kalmanfilter.hpp"
 #include "wifi.h"
-#include "tcp_server.h"
 #include "tcp_client.hpp"
 
 #include "nvs_flash.h"

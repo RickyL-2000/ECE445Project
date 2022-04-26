@@ -2,8 +2,8 @@
 // Created by 51284 on 2022/4/21.
 //
 
-#ifndef JOYSTICK_TCP_SERVER_H
-#define JOYSTICK_TCP_SERVER_H
+#ifndef _TCP_SERVER_H_
+#define _TCP_SERVER_H_
 /* BSD Socket API Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
@@ -32,17 +32,16 @@
 #define KEEPALIVE_INTERVAL          3
 #define KEEPALIVE_COUNT             3
 
-#define BUFFER_SIZE     1024
+#define BUFFER_SIZE     128
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-void tcp_server_task(void *pvParameters);
+int tcp_server_init();
 
 #ifdef __cplusplus
 };
 #endif
 
 
-#endif //JOYSTICK_TCP_SERVER_H
+#endif //_TCP_SERVER_H_
