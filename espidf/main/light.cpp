@@ -37,10 +37,12 @@ typedef struct sharedData_t {
 } sharedData_t;
 
 
-const TickType_t xPeriodTicks = 100 / portTICK_PERIOD_MS;
+const TickType_t xPeriodTicks = 1000 / portTICK_PERIOD_MS;
 
 
 void tcp_server_task(void *pvParameters) {
+    static char TAG[] = "tcp_server_task";
+
     auto *parameters = (tcpServerTaskParameters_t *) pvParameters;
     char addr_str[128];
     int keepAlive = 1;
@@ -106,7 +108,7 @@ void tcp_server_task(void *pvParameters) {
                     output_buffer[slen] = 0; // Null-terminate whatever is received and treat it like a string
                     ESP_LOGI(TAG, "Received %d bytes: %s", recv_len, output_buffer);
                 }
-                sscanf(output_buffer, "(%f, %f, %d, %d, %d)", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
+                sscanf(output_buffer, "(%f, %f), (%d, %d, %d)", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
                        &(ledCommend.B));
 
                 // queue send will copy the content of the given pointer. So the buffer can be dynamically allocated.
@@ -126,7 +128,6 @@ void tcp_server_task(void *pvParameters) {
 void dummy_control_task(void *pvParameters) {
     static char TAG[] = "dummy_control_task";
     auto *commandQueues = (commandQueues_t *) pvParameters;
-    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
 
     float pitch, roll;
     ledCommend_t ledCommend;
