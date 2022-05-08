@@ -11,15 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include <stdlib.h>
-#include <string.h>
-#include <sys/cdefs.h>
-#include "esp_log.h"
-#include "esp_attr.h"
-#include "ws2812.hpp"
-#include "driver/rmt.h"
 
-#define RMT_TX_CHANNEL RMT_CHANNEL_0
+#include "ws2812.hpp"
 
 static const char *TAG = "ws2812";
 #define STRIP_CHECK(a, str, goto_tag, ret_value, ...)                             \
@@ -99,8 +92,10 @@ static esp_err_t ws2812_set_pixel(led_strip_t *strip, uint32_t index, uint32_t r
 {
     esp_err_t ret = ESP_OK;
     ws2812_t *ws2812 = __containerof(strip, ws2812_t, parent);
-    STRIP_CHECK(index < ws2812->strip_len, "index out of the maximum number of leds", err, ESP_ERR_INVALID_ARG);
+    // var initialization cannot be placed after STRIP_CHECK (cross initialization)
+    // https://blog.csdn.net/zzwdkxx/article/details/27561393
     uint32_t start = index * 3;
+    STRIP_CHECK(index < ws2812->strip_len, "index out of the maximum number of leds", err, ESP_ERR_INVALID_ARG);
     // In thr order of GRB
     ws2812->buffer[start + 0] = green & 0xFF;
     ws2812->buffer[start + 1] = red & 0xFF;
@@ -139,18 +134,22 @@ static esp_err_t ws2812_del(led_strip_t *strip)
 led_strip_t *led_strip_new_rmt_ws2812(const led_strip_config_t *config)
 {
     led_strip_t *ret = NULL;
+    uint32_t ws2812_size;
+    ws2812_t *ws2812;
+    uint32_t counter_clk_hz;
+    float ratio;
     STRIP_CHECK(config, "configuration can't be null", err, NULL);
 
     // 24 bits per led
-    uint32_t ws2812_size = sizeof(ws2812_t) + config->max_leds * 3;
-    ws2812_t *ws2812 = calloc(1, ws2812_size);
+    ws2812_size = sizeof(ws2812_t) + config->max_leds * 3;
+    ws2812 = (ws2812_t*) calloc(1, ws2812_size);
     STRIP_CHECK(ws2812, "request memory for ws2812 failed", err, NULL);
 
-    uint32_t counter_clk_hz = 0;
+    counter_clk_hz = 0;
     STRIP_CHECK(rmt_get_counter_clock((rmt_channel_t)config->dev, &counter_clk_hz) == ESP_OK,
                 "get rmt counter clock failed", err, NULL);
     // ns -> ticks
-    float ratio = (float)counter_clk_hz / 1e9;
+    ratio = (float) counter_clk_hz / 1e9;
     ws2812_t0h_ticks = (uint32_t)(ratio * WS2812_T0H_NS);
     ws2812_t0l_ticks = (uint32_t)(ratio * WS2812_T0L_NS);
     ws2812_t1h_ticks = (uint32_t)(ratio * WS2812_T1H_NS);
@@ -172,7 +171,7 @@ led_strip_t *led_strip_new_rmt_ws2812(const led_strip_config_t *config)
     return ret;
 }
 
-led_strip_t * led_strip_init(uint8_t channel, uint8_t gpio, uint16_t led_num)
+led_strip_t * led_strip_init(rmt_channel_t channel, gpio_num_t gpio, uint16_t led_num)
 {
     static led_strip_t *pStrip;
 
@@ -204,4 +203,50 @@ esp_err_t led_strip_denit(led_strip_t *strip)
     ws2812_t *ws2812 = __containerof(strip, ws2812_t, parent);
     ESP_ERROR_CHECK(rmt_driver_uninstall(ws2812->rmt_channel));
     return strip->del(strip);
+}
+
+void led_strip_hsv2rgb(uint32_t h, uint32_t s, uint32_t v, uint32_t *r, uint32_t *g, uint32_t *b)
+{
+    h %= 360; // h -> [0,360]
+    uint32_t rgb_max = v * 2.55f;
+    uint32_t rgb_min = rgb_max * (100 - s) / 100.0f;
+
+    uint32_t i = h / 60;
+    uint32_t diff = h % 60;
+
+    // RGB adjustment amount by hue
+    uint32_t rgb_adj = (rgb_max - rgb_min) * diff / 60;
+
+    switch (i) {
+        case 0:
+            *r = rgb_max;
+            *g = rgb_min + rgb_adj;
+            *b = rgb_min;
+            break;
+        case 1:
+            *r = rgb_max - rgb_adj;
+            *g = rgb_max;
+            *b = rgb_min;
+            break;
+        case 2:
+            *r = rgb_min;
+            *g = rgb_max;
+            *b = rgb_min + rgb_adj;
+            break;
+        case 3:
+            *r = rgb_min;
+            *g = rgb_max - rgb_adj;
+            *b = rgb_max;
+            break;
+        case 4:
+            *r = rgb_min + rgb_adj;
+            *g = rgb_min;
+            *b = rgb_max;
+            break;
+        default:
+            *r = rgb_max;
+            *g = rgb_min;
+            *b = rgb_max - rgb_adj;
+            break;
+    }
 }

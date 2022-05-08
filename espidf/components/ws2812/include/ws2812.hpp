@@ -11,13 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+#ifndef _WS2812_HPP
+#define _WS2812_HPP
+
 #pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <stdlib.h>
+#include <string.h>
+#include <sys/cdefs.h>
+#include "esp_log.h"
+#include "esp_attr.h"
 #include "esp_err.h"
+
+#include "driver/rmt.h"
 
 /**
 * @brief LED Strip Type
@@ -29,7 +40,8 @@ typedef struct led_strip_s led_strip_t;
 * @brief LED Strip Device Type
 *
 */
-typedef void *led_strip_dev_t;
+//typedef void *led_strip_dev_t;
+typedef rmt_channel_t led_strip_dev_t;  // Avoid unnecessary trouble
 
 /**
 * @brief Declare of LED Strip Type
@@ -130,7 +142,8 @@ led_strip_t *led_strip_new_rmt_ws2812(const led_strip_config_t *config);
  * @return
  *      LED strip instance or NULL
  */
-led_strip_t * led_strip_init(uint8_t channel, uint8_t gpio, uint16_t led_num);
+//led_strip_t * led_strip_init(uint8_t channel, uint8_t gpio, uint16_t led_num);
+led_strip_t * led_strip_init(rmt_channel_t channel, gpio_num_t gpio, uint16_t led_num);
 
 /**
  * @brief Denit the RMT peripheral.
@@ -142,6 +155,16 @@ led_strip_t * led_strip_init(uint8_t channel, uint8_t gpio, uint16_t led_num);
  */
 esp_err_t led_strip_denit(led_strip_t *strip);
 
+/**
+ * @brief Simple helper function, converting HSV color space to RGB color space
+ *
+ * Wiki: https://en.wikipedia.org/wiki/HSL_and_HSV
+ *
+ */
+void led_strip_hsv2rgb(uint32_t h, uint32_t s, uint32_t v, uint32_t *r, uint32_t *g, uint32_t *b);
+
 #ifdef __cplusplus
 }
 #endif
+
+#endif //_WS2812_HPP
