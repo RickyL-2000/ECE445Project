@@ -17,9 +17,10 @@ except:
 
 
 class Channel:
-    def __init__(self, name) -> None:
+    def __init__(self, name, verbose=False) -> None:
         self.name = name
         self.is_server = False
+        self.verbose = verbose
 
     def close(self):
 
@@ -41,7 +42,7 @@ class Channel:
         self.s.listen(BACKLOG)  # 监听套接字, 最多允许backlog个连接
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # 设置套接字
         log.success('server host at {}:{}'.format(self.local_host, self.local_port))
-        log.info('tcp waiting...')
+        if self.verbose: log.info('tcp waiting...')
 
     def listen(self) -> None:
         if not self.is_server:
@@ -49,7 +50,8 @@ class Channel:
                     "only server can listen, set as server by calling becomeServer()")
             return
         while True:
-            log.info("accepting.....")
+            if self.verbose:
+                if self.verbose: log.info("accepting.....")
             conn, addr = self.s.accept()  # 接收连接请求，返回收发数据的套接字对象和客户端地址
             log.success("{} connected".format(addr))
             if CENTRAL_SERVER:
@@ -58,12 +60,12 @@ class Channel:
                 else:
                     self.connections[addr[0]].close()
                     self.connections[addr[0]] = conn
-                listen_t = Thread(target=self.client_listen, args=(conn,), daemon=True)
+                listen_t = Thread(target=self.client_listen, args=(conn, addr), daemon=True)
                 listen_t.start()
             else:
                 self.client_listen(conn)
 
-    def client_listen(self, conn):
+    def client_listen(self, conn, addr):
         try:
             while True:
                 chunk = conn.recv(BUFFER_SIZE)
@@ -74,6 +76,7 @@ class Channel:
                 while len(chunk) < slen:
                     chunk = chunk + conn.recv(slen - len(chunk))
                 obj = chunk.decode("ascii")
+                if self.verbose: log.info(f"recv from {addr}: {obj}")
 
                 self.recv_callback(obj)
 
@@ -123,7 +126,7 @@ class Channel:
         try:
             # self.s.send(s)
             self.s.send(slen + s)
-            log.info("send to {}: {}".format(self.server_host, msg))
+            if self.verbose: log.info("send to {}: {}".format(self.server_host, msg))
         except Exception as e:
             log.error(e)
             self.connected = False
