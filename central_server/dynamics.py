@@ -1,7 +1,6 @@
 from utils.channel import Channel
 from utils.config import PC_IP, DYNAMICS_PORT
 from threading import Thread
-import numpy as np
 import math
 import parse
 import queue
@@ -28,20 +27,19 @@ class Dynamics:
         self.joystick_queue = queue.Queue(100)
 
     def recv(self, msg):
-        theta, phi, move, color, record = parse.parse("fptich:{:f}, froll:{:f}, move:{:d}, color:{:d}, record:{:d}",
-                                                      msg)
+        theta, phi, move, color, record = parse.parse("({:f}, {:f}, {:d}, {:d}, {:d})", msg)
         # theta, phi = parse.parse("fptich:{:f}, froll:{:f}", msg)
-        theta, phi = self.spatial_remap(theta, phi)
+        theta, phi = Dynamics.spatial_remap(theta, phi)
         theta, phi = self.temporal_remap(theta, phi)
         joystick_data = ((theta, phi), (move, color, record))  # (posture,buttons)
-
         self.joystick_queue.put(joystick_data)
 
     @classmethod
     def nonlinear_cut(cls, value, origin_upper, remap_upper):
-        return remap_upper * math.log(value) / math.log(origin_upper)
+        return remap_upper * math.sin(value * math.pi / origin_upper / 2)
 
-    def spatial_remap(self, theta, phi):
+    @classmethod
+    def spatial_remap(cls, theta, phi):
         theta = Dynamics.nonlinear_cut(theta, ORIGIN_UPPER, THETA_REMAP)
         phi = Dynamics.nonlinear_cut(phi, ORIGIN_UPPER, PHI_REMAP)
         return theta, phi
