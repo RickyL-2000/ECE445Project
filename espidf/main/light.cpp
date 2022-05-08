@@ -1,5 +1,6 @@
 #include "wifi.h"
 #include "tcp_server.h"
+#include "ws2812.hpp"
 
 #include "nvs_flash.h"
 
@@ -10,8 +11,12 @@
 #include <stdio.h>
 #include <functional>
 
-
 static const char *TAG = "light_main";
+
+// parameters for ws2812 control
+#define RMT_TX_CHANNEL RMT_CHANNEL_0
+#define LED_NUMBER 64
+static gpio_num_t RMT_TX_GPIO = (gpio_num_t) 25;
 
 typedef struct ledCommend_t {
     int R;
@@ -145,6 +150,38 @@ void dummy_control_task(void *pvParameters) {
     vTaskDelete(nullptr);
 }
 
+void dummy_led_task(void *pvParameters) {
+    static char TAG[] = "dummy_led_task";
+
+    led_strip_t *strip = led_strip_init(RMT_TX_CHANNEL, RMT_TX_GPIO, LED_NUMBER);
+
+    // Show simple rainbow chasing pattern
+    ESP_LOGI(TAG, "LED Rainbow Chase Start");
+    uint32_t red = 0;
+    uint32_t green = 0;
+    uint32_t blue = 0;
+    uint16_t hue = 0;
+    uint16_t start_rgb = 0;
+    for (;;) {
+        for (int i = 0; i < 3; i++) {
+            for (int j = i; j < LED_NUMBER; j += 3) {
+                // Build RGB values
+                hue = j * 360 / LED_NUMBER + start_rgb;
+                led_strip_hsv2rgb(hue, 100, 100, &red, &green, &blue);
+                // Write RGB values to strip driver
+                // ESP_LOGI(TAG, "%d", j);
+                ESP_ERROR_CHECK(strip->set_pixel(strip, j, red, green, blue));
+            }
+            // Flush RGB values to LEDs
+            ESP_ERROR_CHECK(strip->refresh(strip, 100));
+            vTaskDelay(pdMS_TO_TICKS(10));
+            strip->clear(strip, 50);
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        start_rgb += 60;
+    }
+}
+
 extern "C" void app_main() {
     printf("app_main\n");
 
@@ -155,6 +192,13 @@ extern "C" void app_main() {
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+//    // test dummy led
+//    auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
+//    TaskHandle_t dummy_led_handle;
+//    xTaskCreate(dummy_led_task, "dummy_led", 4096,
+//                commandQueues_p, 5, &dummy_led_handle);
+
 
     // Initialize wifi and connect
     wifi_init_sta();

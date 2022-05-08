@@ -1,2 +1,2 @@
-idf_component_register(SRCS "joystick.cpp"
+idf_component_register(SRCS "light.cpp"
                     INCLUDE_DIRS "")
