@@ -20,7 +20,7 @@
 
 #define HOST_IP_ADDR "192.168.31.177"
 
-#define PORT 12345
+#define PORT 8880
 
 class TcpClient {
 private:

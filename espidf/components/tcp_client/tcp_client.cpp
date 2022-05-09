@@ -62,7 +62,7 @@ int TcpClient::send(char *msg) {
         return ESP_FAIL;
     }
     unsigned long slen = strlen(msg);
-    ESP_LOGI(TAG,"Send slen:%lu",slen);
+    ESP_LOGD(TAG,"Send slen:%lu",slen);
     if (::send(sock,&slen,4,0) < 0) {
         connected = false;
         ESP_LOGE(TAG, "Error occurred during sending slen: errno %d", errno);
@@ -71,7 +71,7 @@ int TcpClient::send(char *msg) {
         return errno;
     }
 
-    ESP_LOGI(TAG,"Send msg:%s",msg);
+    ESP_LOGD(TAG,"Send msg:%s",msg);
     if (::send(sock, msg, slen, 0) < 0) {
         connected = false;
         ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);

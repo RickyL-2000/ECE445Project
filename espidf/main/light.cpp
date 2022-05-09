@@ -19,9 +19,9 @@ static const char *TAG = "light_main";
 static gpio_num_t RMT_TX_GPIO = (gpio_num_t) 25;
 
 typedef struct ledCommend_t {
-    int R;
-    int G;
-    int B;
+    uint32_t R;
+    uint32_t G;
+    uint32_t B;
 } ledCommend_t;
 
 typedef struct commandQueues_t {
@@ -36,10 +36,10 @@ typedef struct tcpServerTaskParameters_t {
 } tcpServerTaskParameters_t;
 
 
-typedef struct sharedData_t {
-    SemaphoreHandle_t mutex;
-    void *data_p;
-} sharedData_t;
+//typedef struct sharedData_t {
+//    SemaphoreHandle_t mutex;
+//    void *data_p;
+//} sharedData_t;
 
 
 const TickType_t xPeriodTicks = 1000 / portTICK_PERIOD_MS;
@@ -113,7 +113,7 @@ void tcp_server_task(void *pvParameters) {
                     output_buffer[slen] = 0; // Null-terminate whatever is received and treat it like a string
                     ESP_LOGI(TAG, "Received %d bytes: %s", recv_len, output_buffer);
                 }
-                sscanf(output_buffer, "(%f, %f), (%d, %d, %d)", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
+                sscanf(output_buffer, "(%f, %f), (%u, %u, %u)", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
                        &(ledCommend.B));
 
                 // queue send will copy the content of the given pointer. So the buffer can be dynamically allocated.
@@ -139,16 +139,46 @@ void dummy_control_task(void *pvParameters) {
 
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
-    for(;;){
+    for (;;) {
         xQueueReceive(commandQueues->servoQueue, &roll, 0);
         xQueueReceive(commandQueues->stepQueue, &pitch, 0);
         xQueueReceive(commandQueues->ledQueue, &ledCommend, 0);
-        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %d,%d,%d", pitch, roll, ledCommend.R, ledCommend.G,
+        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %u,%u,%u", pitch, roll, ledCommend.R, ledCommend.G,
                  ledCommend.B);
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
 }
+
+void led_control_task(void *pvParameters) {
+    static char TAG[] = "led_control_task";
+    auto *commandQueues = (commandQueues_t *) pvParameters;
+
+    ledCommend_t ledCommend;
+
+    led_strip_t *strip = led_strip_init(RMT_TX_CHANNEL, RMT_TX_GPIO, LED_NUMBER);
+    // Show simple rainbow chasing pattern
+    ESP_LOGI(TAG, "LED Rainbow Chase Start");
+
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    for (;;) {
+        xQueueReceive(commandQueues->ledQueue, &ledCommend, 0);
+        ESP_LOGI(TAG, "receive from led queue:  %u,%u,%u", ledCommend.R, ledCommend.G, ledCommend.B);
+        for (int j = 0; j < LED_NUMBER; j++) {
+            ESP_ERROR_CHECK(strip->set_pixel(strip, j, ledCommend.R, ledCommend.G, ledCommend.B));
+        }
+        // Flush RGB values to LEDs
+        ESP_ERROR_CHECK(strip->refresh(strip, 100));
+        vTaskDelay(pdMS_TO_TICKS(10));
+        strip->clear(strip, 50);
+        vTaskDelay(pdMS_TO_TICKS(10));
+
+        vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
+    }
+    vTaskDelete(nullptr);
+}
+
 
 void dummy_led_task(void *pvParameters) {
     static char TAG[] = "dummy_led_task";
@@ -233,5 +263,9 @@ extern "C" void app_main() {
     TaskHandle_t dummy_control_handle;
     xTaskCreate(dummy_control_task, "dummy_control", 4096,
                 commandQueues_p, 5, &dummy_control_handle);
+
+    TaskHandle_t led_control_handle;
+    xTaskCreate(led_control_task, "led_control", 4096,
+                commandQueues_p, 5, &led_control_handle);
 
 }
