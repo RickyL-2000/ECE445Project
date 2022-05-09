@@ -1,6 +1,7 @@
 import queue
 import random
 import time
+import pygame
 from threading import Thread
 
 from transitions import Machine
@@ -27,8 +28,8 @@ class Gimbal:
             {'trigger':'move_button_press', 'source':'repeat', 'dest':'random'},
             {'trigger':'move_button_press', 'source':'random', 'dest':'mimic'},
 
-            {'trigger':'record_button_change', 'source':'mimic','dest':'record'},
-            {'trigger':'record_button_change', 'source':'record','dest':'mimic'}
+            {'trigger':'record_button_change', 'source':'mimic', 'dest':'record'},
+            {'trigger':'record_button_change', 'source':'record', 'dest':'mimic'}
     ]
 
     def __init__(self) -> None:
@@ -62,7 +63,7 @@ class RandomGenerator:
 
 
 class Control:
-    def __init__(self, dynamics, music_analysis, lights_config) -> None:
+    def __init__(self, dynamics, music_analysis, music_player, lights_config, ):
         """
         :param lights_config: socket client information of light arrays, with form
                 { "lightA":
@@ -78,7 +79,8 @@ class Control:
         self.random_gene = RandomGenerator()
         self.dynamics = dynamics
         self.music_analysis = music_analysis
-        self.command_queue = queue.Queue(100)
+        self.music_player = music_player
+        self.command_queue = queue.Queue(1000)
         self.light_connections = {}
         self.record_buffer = CircularQueue(1000)
 
