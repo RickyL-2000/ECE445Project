@@ -7,6 +7,7 @@ from transitions import Machine
 
 from utils.channel import Channel
 
+PERIOD = 0.01 #s
 
 class CircularQueue(queue.Queue):
     def __init__(self, maxsize):
@@ -54,7 +55,7 @@ class RandomGenerator:
         self.random_seed = 12345
 
     def random_posture(self):
-        return random.random() * 360, random.random() * 360
+        return random.random() * 240, random.random() * 240
 
     def random_color(self):
         return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
@@ -159,38 +160,46 @@ class Control:
             self.command_queue: string type command for the light arrays
                 format: "(theta, phi), (R, G, B)"
         """
+        d_posture, buttons = (0.0, 0.0), (0, 0, 0)
         while True:
+            # ============  get posture data from joystick
             try:
                 d_posture, buttons = self.dynamics.joystick_queue.get(
                         block=False)
             except queue.Empty as e:
-                # give repeated or random posture data
                 # FIXME: The queue should never be empty with the temporal remap in the dynamic subsystem
-                d_posture, buttons = (100.0, 100.0), (0, 0, 0)
+                # give the same value if no new data is received.
+                pass
 
-            try:
-                m_color = self.music_analysis.color_queue.get(block=False)
-            except queue.Empty as e:
-                # FIXME: The queue should never be empty with the as the color data is preprocessed in the dynamic subsystem
-                # give repeated or random posture data
-                m_color = (0, 0, 0)
-            except Exception as e:
-                # give repeated or random posture data
-                m_color = (0, 0, 0)
+            # ============  get color data from music analysis subsystem, according the play states
+            if self.music_player.get_busy():
+                try:
+                    m_color = self.music_analysis.color_queue.get(block=False)
+                except queue.Empty as e:
+                    # FIXME: The queue should never be empty with the as the color data is preprocessed in the dynamic subsystem
+                    # pure blue indicates queue empty
+                    m_color = (0, 0, 255)
+                except Exception as e:
+                    # pure red indicates unexcepted error
+                    m_color = (255, 0, 0)
+            else:
+                # pure green indicates no music is playing
+                m_color = (0, 255, 0)
+
 
             self.button_trigger(buttons)
             posture_command, color_command = self.filter(d_posture, m_color)
             self.command_queue.put(
                     f"{posture_command}, {color_command}", block=False)
 
-            time.sleep(1)
+            # time.sleep(PERIOD)
 
     def send(self):
         """Periodly send the command from the command queue to the light tcp server"""
         command = ""
         while True:
             try:
-                command = self.command_queue.get(block=False)
+                command = self.command_queue.get(block=True)
             except queue.Empty as e:
                 # FIXME: The queue should never be empty, as mentioned in recv and the maintainance of control subsystem
                 #       here just do nothing to variable `command` to send the same command when crash
@@ -199,14 +208,15 @@ class Control:
                 send_t = Thread(target=self.light_connections[id].send, args=(
                         command,), daemon=True)
                 send_t.start()
-            time.sleep(1)
+            # time.sleep(PERIOD)
 
     def monitor(self):
         while True:
             print(self)
-            time.sleep(1)
+            time.sleep(PERIOD)
 
     def run(self):
+        # self.music_player.play()
         recv_t = Thread(target=self.recv, daemon=True)
         send_t = Thread(target=self.send, daemon=True)
         monitor_t = Thread(target=self.monitor, daemon=True)
