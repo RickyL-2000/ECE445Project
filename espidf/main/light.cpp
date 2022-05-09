@@ -1,6 +1,7 @@
 #include "wifi.h"
 #include "tcp_server.h"
 #include "ws2812.hpp"
+#include "servo.hpp"
 
 #include "nvs_flash.h"
 
@@ -17,6 +18,9 @@ static const char *TAG = "light_main";
 #define RMT_TX_CHANNEL RMT_CHANNEL_0
 #define LED_NUMBER 64
 static gpio_num_t RMT_TX_GPIO = (gpio_num_t) 25;
+
+// parameters for servo control
+static gpio_num_t SERVO_DS3230_GPIO = (gpio_num_t) 18;
 
 typedef struct ledCommend_t {
     int R;
@@ -182,6 +186,67 @@ void dummy_led_task(void *pvParameters) {
     }
 }
 
+void dummy_servo_task(void *pvParameters) {
+    // static char TAG[] = "dummy_servo_task";
+    int servo_type = DS3218;
+
+    // DS3218
+    if (servo_type == DS3218) {
+        static char TAG[] = "dummy_servo_task DS3218";
+        Servo servo3218(servo_type, SERVO_DS3230_GPIO,
+                        MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
+        for (;;) {
+            for (int angle = -SERVO_MAX_DEGREE_DS3218; angle < SERVO_MAX_DEGREE_DS3218; angle += 10) {
+                ESP_LOGI(TAG, "Angle of rotation: %d", angle);
+                ESP_ERROR_CHECK(servo3218.set_angle(angle));
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+            for (int angle = SERVO_MAX_DEGREE_DS3218; angle > -SERVO_MAX_DEGREE_DS3218; angle -= 10) {
+                ESP_LOGI(TAG, "Angle of rotation: %d", angle);
+                ESP_ERROR_CHECK(servo3218.set_angle(angle));
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+    } else if (servo_type == DS3230) {
+        // DS3230
+        static char TAG[] = "dummy_servo_task DS3230";
+        Servo servo3230(servo_type, SERVO_DS3230_GPIO,
+                        MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
+        for (;;) {
+            for (int angle = -SERVO_MAX_DEGREE_DS3230; angle < SERVO_MAX_DEGREE_DS3230; angle += 10) {
+                ESP_LOGI(TAG, "Angle of rotation: %d %d", angle, servo3230.servo_angle);
+                ESP_ERROR_CHECK(servo3230.set_angle(angle));
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+            for (int angle = SERVO_MAX_DEGREE_DS3230; angle > -SERVO_MAX_DEGREE_DS3230; angle -= 10) {
+                ESP_LOGI(TAG, "Angle of rotation: %d %d", angle, servo3230.servo_angle);
+                ESP_ERROR_CHECK(servo3230.set_angle(angle));
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+            vTaskDelay(pdMS_TO_TICKS(2000));
+
+            // ESP_ERROR_CHECK(servo3230.set_angle(-180));
+
+            // vTaskDelay(pdMS_TO_TICKS(1000));
+            // ESP_ERROR_CHECK(servo3230.set_angle(-100));
+            // vTaskDelay(pdMS_TO_TICKS(1000));
+            // ESP_ERROR_CHECK(servo3230.set_angle(0));
+            // for (int angle = -SERVO_MAX_DEGREE_DS3230; angle < SERVO_MAX_DEGREE_DS3230; angle += 30) {
+            //     ESP_LOGI(TAG, "Angle of rotation: %d", angle);
+            //     ESP_ERROR_CHECK(servo3230.set_angle(30));
+            //     vTaskDelay(pdMS_TO_TICKS(500));
+            // }
+            // for (int angle = SERVO_MAX_DEGREE_DS3230; angle > -SERVO_MAX_DEGREE_DS3230; angle -= 30) {
+            //     ESP_LOGI(TAG, "Angle of rotation: %d", angle);
+            //     ESP_ERROR_CHECK(servo3230.set_angle(-30));
+            //     vTaskDelay(pdMS_TO_TICKS(500));
+            // }
+            // vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+}
+
 extern "C" void app_main() {
     printf("app_main\n");
 
@@ -193,21 +258,27 @@ extern "C" void app_main() {
     }
     ESP_ERROR_CHECK(ret);
 
-//    // test dummy led
-//    auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
-//    TaskHandle_t dummy_led_handle;
-//    xTaskCreate(dummy_led_task, "dummy_led", 4096,
-//                commandQueues_p, 5, &dummy_led_handle);
+   // // test dummy led
+   // auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
+   // TaskHandle_t dummy_led_handle;
+   // xTaskCreate(dummy_led_task, "dummy_led", 4096,
+   //             commandQueues_p, 5, &dummy_led_handle);
+
+    // // test dummy servo
+    // auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
+    // TaskHandle_t dummy_servo_handle;
+    // xTaskCreate(dummy_servo_task, "dummy_servo", 4096,
+    //             commandQueues_p, 5, &dummy_servo_handle);
 
 
     // Initialize wifi and connect
     wifi_init_sta();
 
-    // used for sharing data, but queue always copy, so un-used
-//    auto *mpuData = (struct mpuData_t *) malloc(sizeof(struct mpuData_t));
-//    auto *sharedMpuData = (sharedData_t *) malloc(sizeof(sharedData_t));
-//    sharedMpuData->mutex = xSemaphoreCreateMutex();
-//    sharedMpuData->data_p = (void *const) mpuData;
+   //  used for sharing data, but queue always copy, so un-used
+   // auto *mpuData = (struct mpuData_t *) malloc(sizeof(struct mpuData_t));
+   // auto *sharedMpuData = (sharedData_t *) malloc(sizeof(sharedData_t));
+   // sharedMpuData->mutex = xSemaphoreCreateMutex();
+   // sharedMpuData->data_p = (void *const) mpuData;
 
 
     // from tcp server to the command queue

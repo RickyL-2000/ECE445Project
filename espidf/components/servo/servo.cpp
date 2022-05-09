@@ -33,8 +33,38 @@ uint32_t Servo::angle2dutyus(int angle) const {
 }
 
 esp_err_t Servo::set_angle(int angle) {
-    ESP_ERROR_CHECK(
-            mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer, servo_mcpwm_generator, angle2dutyus(angle))
-            );
+    if (servo_name == DS3218) {
+        ESP_ERROR_CHECK(
+                mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer, servo_mcpwm_generator, angle2dutyus(angle))
+        );
+        return ESP_OK;
+    } else if (servo_name == DS3230) {
+           float ccw_speed = 215.18;
+           float cw_speed = 193.75;
+           float offset;
+           int speed_index = 180;
+           if (abs(servo_angle - angle) > abs((servo_angle+360)%360 - (angle+360)%360)) {
+               offset =  (float)((angle+360) % 360 - (servo_angle+360) % 360);
+           } else {
+               offset = (float) (angle - servo_angle);
+           }
+           if (offset > 0) {
+               speed_index = abs(speed_index);
+               ESP_ERROR_CHECK(mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer,
+                                                    servo_mcpwm_generator, angle2dutyus(speed_index)));
+               vTaskDelay(pdMS_TO_TICKS(int(1000 * abs(offset) / ccw_speed)));
+               ESP_ERROR_CHECK(mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer,
+                                                    servo_mcpwm_generator, angle2dutyus(0)));
+           } else if (offset < 0) {
+               speed_index = -abs(speed_index);
+               ESP_ERROR_CHECK(mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer,
+                                                    servo_mcpwm_generator, angle2dutyus(speed_index)));
+               vTaskDelay(pdMS_TO_TICKS(int(1000 * abs(offset) / cw_speed)));
+               ESP_ERROR_CHECK(mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer,
+                                                    servo_mcpwm_generator, angle2dutyus(0)));
+           }
+           servo_angle = angle;
+           return ESP_OK;
+    }
     return ESP_OK;
 }
