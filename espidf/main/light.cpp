@@ -21,7 +21,8 @@ static const char *TAG = "light_main";
 static gpio_num_t RMT_TX_GPIO = (gpio_num_t) 25;
 
 // parameters for servo control
-static gpio_num_t SERVO_DS3230_GPIO = (gpio_num_t) 18;
+static gpio_num_t SERVO_YAW_GPIO = (gpio_num_t) 18;
+static gpio_num_t SERVO_PITCH_GPIO = (gpio_num_t) 19;
 
 typedef struct ledCommend_t {
     uint32_t R;
@@ -31,8 +32,8 @@ typedef struct ledCommend_t {
 
 typedef struct commandQueues_t {
     QueueHandle_t ledQueue;
-    QueueHandle_t stepQueue;
-    QueueHandle_t servoQueue;
+    QueueHandle_t pitchQueue;
+    QueueHandle_t yawQueue;
 } commandQueues_t;
 
 typedef struct tcpServerTaskParameters_t {
@@ -122,8 +123,8 @@ void tcp_server_task(void *pvParameters) {
                        &(ledCommend.B));
 
                 // queue send will copy the content of the given pointer. So the buffer can be dynamically allocated.
-                xQueueSend((parameters->commandQueues_p)->stepQueue, &pitch, 0);
-                xQueueSend((parameters->commandQueues_p)->servoQueue, &roll, 0);
+                xQueueSend((parameters->commandQueues_p)->pitchQueue, &pitch, 0);
+                xQueueSend((parameters->commandQueues_p)->yawQueue, &roll, 0);
                 xQueueSend((parameters->commandQueues_p)->ledQueue, &ledCommend, 0);
 
             }
@@ -145,11 +146,10 @@ void dummy_control_task(void *pvParameters) {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        xQueueReceive(commandQueues->servoQueue, &roll, 0);
-        xQueueReceive(commandQueues->stepQueue, &pitch, 0);
-        xQueueReceive(commandQueues->ledQueue, &ledCommend, 0);
-        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %u,%u,%u", pitch, roll, ledCommend.R, ledCommend.G,
-                 ledCommend.B);
+        xQueuePeek(commandQueues->yawQueue, &roll, 0);
+        xQueuePeek(commandQueues->pitchQueue, &pitch, 0);
+        xQueuePeek(commandQueues->ledQueue, &ledCommend, 0);
+        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %u,%u,%u", pitch, roll, ledCommend.R, ledCommend.G, ledCommend.B);
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -162,8 +162,6 @@ void led_control_task(void *pvParameters) {
     ledCommend_t ledCommend;
 
     led_strip_t *strip = led_strip_init(RMT_TX_CHANNEL, RMT_TX_GPIO, LED_NUMBER);
-    // Show simple rainbow chasing pattern
-    ESP_LOGI(TAG, "LED Rainbow Chase Start");
 
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
@@ -215,6 +213,33 @@ void dummy_led_task(void *pvParameters) {
         }
         start_rgb += 60;
     }
+}
+
+void servo_control_task(void *pvParameters) {
+    static char TAG[] = "servo_control_task";
+    auto *commandQueues = (commandQueues_t *) pvParameters;
+
+    float pitch, yaw;
+
+    Servo servo_yaw(DS3218, SERVO_YAW_GPIO,
+                    MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
+    Servo servo_pitch(DS3218, SERVO_PITCH_GPIO,
+                    MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
+
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    for (;;) {
+        xQueueReceive(commandQueues->pitchQueue, &pitch, 0);
+        xQueueReceive(commandQueues->yawQueue, &yaw, 0);
+        ESP_LOGI(TAG, "receive from servo queue: %.2f, %.2f", pitch, yaw)
+        ESP_ERROR_CHECK(servo_pitch.set_angle((int)pitch));
+        vTaskDelay(pdMS_TO_TICKS(50));
+        ESP_ERROR_CHECK(servo_yaw.set_angle((int)yaw));
+        vTaskDelay(pdMS_TO_TICKS(50));
+
+        vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
+    }
+    vTaskDelete(nullptr);
 }
 
 void dummy_servo_task(void *pvParameters) {
@@ -275,8 +300,8 @@ extern "C" void app_main() {
 
     // from tcp server to the command queue
     auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
-    commandQueues_p->stepQueue = xQueueCreate(10, sizeof(float));
-    commandQueues_p->servoQueue = xQueueCreate(10, sizeof(float));
+    commandQueues_p->pitchQueue = xQueueCreate(10, sizeof(float));
+    commandQueues_p->yawQueue = xQueueCreate(10, sizeof(float));
     commandQueues_p->ledQueue = xQueueCreate(10, sizeof(ledCommend_t));
 
 
@@ -293,12 +318,12 @@ extern "C" void app_main() {
     xTaskCreate(tcp_server_task, "tcp_server", 4096,
                 tcpServerTaskParameters, 5, &tcp_server_handle);
 
-    TaskHandle_t dummy_control_handle;
-    xTaskCreate(dummy_control_task, "dummy_control", 4096,
-                commandQueues_p, 5, &dummy_control_handle);
+    TaskHandle_t servo_control_handle;
+    xTaskCreate(servo_control_task, "servo_control", 4096,
+                commandQueues_p, 5, &servo_control_handle);
 
-    TaskHandle_t led_control_handle;
-    xTaskCreate(led_control_task, "led_control", 4096,
-                commandQueues_p, 5, &led_control_handle);
+    // TaskHandle_t dummy_control_handle;
+    // xTaskCreate(dummy_control_task, "dummy_control", 4096,
+    //             commandQueues_p, 5, &dummy_control_handle);
 
 }
