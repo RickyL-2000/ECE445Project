@@ -11,8 +11,8 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#define EXAMPLE_ESP_WIFI_SSID      "iPhone yzh"
-#define EXAMPLE_ESP_WIFI_PASS      "Yang123456"
+#define EXAMPLE_ESP_WIFI_SSID      "RICKY"
+#define EXAMPLE_ESP_WIFI_PASS      "RICKY2000"
 #define EXAMPLE_ESP_MAXIMUM_RETRY  5
 
 /* The event group allows multiple bits for each event, but we only care about two events:

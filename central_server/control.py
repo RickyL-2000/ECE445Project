@@ -83,6 +83,7 @@ class Control:
         self.command_queue = queue.Queue(1000)
         self.light_connections = {}
         self.record_buffer = CircularQueue(1000)
+        self.cur_command = ""
 
         light_conn_ts = []
         for light_id in lights_config:
@@ -94,7 +95,7 @@ class Control:
             t.join()
 
     def __repr__(self):
-        return f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()}"
+        return f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{self.cur_command}"
 
     def connect_lights(self, light_id, light_config):
         self.light_connections[light_id] = Channel(light_id).becomeClient(light_config["host"], light_config["port"])
@@ -166,8 +167,7 @@ class Control:
         while True:
             # ============  get posture data from joystick
             try:
-                d_posture, buttons = self.dynamics.joystick_queue.get(
-                        block=False)
+                d_posture, buttons = self.dynamics.joystick_queue.get(block=False)
             except queue.Empty as e:
                 # FIXME: The queue should never be empty with the temporal remap in the dynamic subsystem
                 # give the same value if no new data is received.
@@ -191,10 +191,10 @@ class Control:
 
             self.button_trigger(buttons)
             posture_command, color_command = self.filter(d_posture, m_color)
-            self.command_queue.put(
-                    f"{posture_command}, {color_command}", block=False)
+            self.command_queue.put(f"{posture_command}, {color_command}", block=False)
+            # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{posture_command}")
 
-            # time.sleep(PERIOD)
+            time.sleep(PERIOD)
 
     def send(self):
         """Periodly send the command from the command queue to the light tcp server"""
@@ -202,6 +202,8 @@ class Control:
         while True:
             try:
                 command = self.command_queue.get(block=True)
+                # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{command}")
+                # self.cur_command = command
             except queue.Empty as e:
                 # FIXME: The queue should never be empty, as mentioned in recv and the maintainance of control subsystem
                 #       here just do nothing to variable `command` to send the same command when crash
