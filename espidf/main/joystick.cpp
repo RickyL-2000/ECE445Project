@@ -1,3 +1,8 @@
+
+#define LOG_LOCAL_LEVEL ESP_LOG_INFO
+
+#include <esp_log.h>
+
 #include "i2c.hpp"
 #include "kalmanfilter.hpp"
 #include "mpu6050.hpp"
@@ -6,7 +11,6 @@
 
 #include "nvs_flash.h"
 
-#include <esp_log.h>
 #include <freertos/semphr.h>
 #include <freertos/FreeRTOS.h>
 #include <cmath>
@@ -17,35 +21,43 @@
 
 static gpio_num_t i2c_gpio_sda = (gpio_num_t) 15;
 static gpio_num_t i2c_gpio_scl = (gpio_num_t) 2;
-static gpio_num_t i2c_record_button = (gpio_num_t) 13;
-static gpio_num_t i2c_stop_button = (gpio_num_t) 12;
-static gpio_num_t i2c_repeat_button = (gpio_num_t) 14;
+static gpio_num_t color_button_pin = (gpio_num_t) 12;
+static gpio_num_t move_button_pin = (gpio_num_t) 13;
+static gpio_num_t record_button_pin = (gpio_num_t) 14;
+
+static gpio_num_t button_pins[3] = {move_button_pin, color_button_pin, record_button_pin};
 
 #define I2C_NUM I2C_NUM_0
-#define DEBOUNCE_TIME 50
+#define DEBOUNCE_TIME (50/portTICK_PERIOD_MS)
 #define HIGH 1
 #define LOW 0
 #define PRESS 1
 #define RELEASE 0
 
-struct mpuData_t {
+typedef struct mpuData_t {
     float fpitch;
     float froll;
-    uint8_t record_button;
-    uint8_t stop_button;
-    uint8_t repeat_button;
-};
+//    uint8_t record_button_pin;
+//    uint8_t stop_button;
+//    uint8_t repeat_button;
+} mpuData_t;
 
-struct sharedData_t {
+typedef int buttonData_t;
+
+typedef struct sharedData_t {
     SemaphoreHandle_t mutex;
     void *data_p;
-};
+} sharedData_t;
 
-const TickType_t xPeriodTicks = 100 / portTICK_PERIOD_MS;
+typedef struct tcpClientParameter_t {
+    sharedData_t *mpuData_p;
+    sharedData_t *buttonsData_p;
+} tcpClientParameter_t;
 
 static void vTaskMpu6050(void *pvParameters) {
 
-    auto *sharedMpuData_p = (struct sharedData_t *const) pvParameters;
+    const char TAG[] = "mpu_task";
+    auto *sharedMpuData_p = (struct sharedData_t *) pvParameters;
 
     /* Uncomment the following line if MPU6050 is connected */
     MPU6050 mpu(i2c_gpio_scl, i2c_gpio_sda, I2C_NUM);
@@ -59,15 +71,15 @@ static void vTaskMpu6050(void *pvParameters) {
     float pitch, roll;
     float fpitch, froll;
     int count = 0;
-//
+
     KALMAN pfilter(0.005);
     KALMAN rfilter(0.005);
 
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        const char TAG[] = "mpu_task";
-        ESP_LOGI(TAG, "wake at %lu", (unsigned long) xLastWakeTime);
+        ESP_LOGD(TAG, "wake at %lu", (unsigned long) xLastWakeTime);
 
         /* Uncomment the following line if MPU6050 is connected */
         ax = -mpu.getAccX();
@@ -76,201 +88,131 @@ static void vTaskMpu6050(void *pvParameters) {
         gx = mpu.getGyroX();
         gy = mpu.getGyroY();
         gz = mpu.getGyroZ();
-        pitch = (float)(atan(ax / az) * 57.2958);
-        roll = (float)(atan(ay / az) * 57.2958);
+        pitch = (float) (atan(ax / az) * 57.2958); // 57.2958 = 360/2/pi
+        roll = (float) (atan(ay / az) * 57.2958);
         fpitch = pfilter.filter(pitch, gy);
         froll = rfilter.filter(roll, -gx);
 
-
-
+        ESP_LOGD(TAG, "take mutex");
         if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
-            ESP_LOGI(TAG, "take mutex");
             ((mpuData_t *) sharedMpuData_p->data_p)->fpitch = fpitch;
             ((mpuData_t *) sharedMpuData_p->data_p)->froll = froll;
-            ESP_LOGI(TAG, "value to: %.2f", (float) count);
-            ESP_LOGI(TAG, "give mutex");
-
-            /* MPU6050 data details */
-            count++;
-            printf("Samples:%d ", count);
-            printf(" Acc:(%4.2f,%4.2f,%4.2f)", ax, ay, az);
-            printf("Gyro:(%6.3f,%6.3f,%6.3f)", gx, gy, gz);
-            printf(" Pitch:%6.3f ", pitch);
-            printf(" Roll:%6.3f ", roll);
-            printf(" FPitch:%6.3f ", fpitch);
-            printf(" FRoll:%6.3f \n", froll);
-
             xSemaphoreGive(sharedMpuData_p->mutex);
+
+//            ESP_LOGI(TAG, "MPU angle: (%.2f, %.2f)", fpitch, froll);
+            ESP_LOGD(TAG, "give mutex");
+
+//            /* MPU6050 data details */
+//            count++;
+//            printf("Samples:%d ", count);
+//            printf(" Acc:(%4.2f,%4.2f,%4.2f)", ax, ay, az);
+//            printf("Gyro:(%6.3f,%6.3f,%6.3f)", gx, gy, gz);
+//            printf(" Pitch:%6.3f ", pitch);
+//            printf(" Roll:%6.3f ", roll);
+//            printf(" FPitch:%6.3f ", fpitch);
+//            printf(" FRoll:%6.3f \n", froll);
             vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
+        } else {
+            ESP_LOGD(TAG, "fail to take mutex");
         }
-//        else {
-//            ESP_LOGW(TAG, "fail to take mutex");
-//        }
-
-
-//        /* MPU6050 data details */
-//        count++;
-//        printf("Samples:%d ", count);
-//        printf(" Acc:(%4.2f,%4.2f,%4.2f)", ax, ay, az);
-//        printf("Gyro:(%6.3f,%6.3f,%6.3f)", gx, gy, gz);
-//        printf(" Pitch:%6.3f ", pitch);
-//        printf(" Roll:%6.3f ", roll);
-//        printf(" FPitch:%6.3f ", fpitch);
-//        printf(" FRoll:%6.3f \n", froll);
     }
     vTaskDelete(nullptr);
 
 }
 
-
 static void vTaskTcpClient(void *pvParameters) {
-    const char TAG[] = "tcp_task";
+    const char TAG[] = "tcp_client_task";
+
+    auto *tcpClientParameter_p = (tcpClientParameter_t *) pvParameters;
+    auto *sharedMpuData_p = tcpClientParameter_p->mpuData_p;
+    auto *sharedButtonData_p = tcpClientParameter_p->buttonsData_p;
     TcpClient client;
-    auto sharedMpuData_p = (sharedData_t *const) pvParameters; // share MpuData_p 应该是指针吧
     auto *msg = (char *) malloc(sizeof(char) * 50);
-    auto *MpuData_p = (struct mpuData_t *) malloc(sizeof(struct mpuData_t));
+    auto *MpuData_p = (mpuData_t *) malloc(sizeof(mpuData_t));
+    auto *buttonData_p = (buttonData_t *) malloc(sizeof(buttonData_t) * 3); // pointer to a 3 length buttonsData_p array
 
-//    vTaskDelay(1000/portTICK_PERIOD_MS);
 
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
     for (;;) {
-//        ESP_LOGI(TAG, "wake at %lu", (unsigned long) xLastWakeTime);
+        ESP_LOGD(TAG, "wake at %lu", (unsigned long) xLastWakeTime);
+        ESP_LOGD(TAG, "take MPU mutex");
         if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
-            ESP_LOGI(TAG, "take mutex");
-            MpuData_p->fpitch = ((mpuData_t *const) sharedMpuData_p->data_p)->fpitch;
-            MpuData_p->froll = ((mpuData_t *const) sharedMpuData_p->data_p)->froll;
-            MpuData_p->record_button = ((mpuData_t *const) sharedMpuData_p->data_p)->record_button;
-            ((mpuData_t *) sharedMpuData_p->data_p)->record_button = RELEASE;
-            ESP_LOGI(TAG, "from mutex: %.2f, %.2f, %d", MpuData_p->fpitch, MpuData_p->froll, MpuData_p->record_button);
-            ESP_LOGI(TAG, "give mutex");
+            MpuData_p->fpitch = ((mpuData_t *) sharedMpuData_p->data_p)->fpitch;
+            MpuData_p->froll = ((mpuData_t *) sharedMpuData_p->data_p)->froll;
             xSemaphoreGive(sharedMpuData_p->mutex);
-            sprintf(msg, "fpitch:%.2f, froll:%.2f, record_button:%d", MpuData_p->fpitch, MpuData_p->froll, MpuData_p->record_button);
-            client.send(msg);
-            vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
-
-//            vTaskDelay(xPeriodTicks);
+//            ESP_LOGI(TAG, "from MPU mutex: %.2f, %.2f", MpuData_p->fpitch, MpuData_p->froll);
+            ESP_LOGD(TAG, "give MPU mutex");
+        } else {
+            ESP_LOGD(TAG, "fail to take MPU mutex");
         }
-//        else
-//        {
-//            ESP_LOGW(TAG, "fail to take mutex");
-//        }
+
+        ESP_LOGD(TAG, "take BUTTON mutex");
+        if (xSemaphoreTake(sharedButtonData_p->mutex, 0) == pdTRUE) {
+            for (int button_idx = 0; button_idx < 3; button_idx++) {
+                buttonData_p[button_idx] = (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx];
+            }
+            xSemaphoreGive(sharedButtonData_p->mutex);
+//            ESP_LOGI(TAG, "from BUTTON mutex: %d, %d, %d", buttonsData_p[0], buttonsData_p[1], buttonsData_p[2]);
+            ESP_LOGD(TAG, "give BUTTON mutex");
+        } else {
+            ESP_LOGD(TAG, "fail to take BUTTON mutex");
+        }
+
+        sprintf(msg, "(%.2f, %.2f, %d, %d, %d)", MpuData_p->fpitch, MpuData_p->froll, buttonData_p[0], buttonData_p[1],
+                buttonData_p[2]);
+
+        client.send(msg);
+        ESP_LOGI(TAG, "send %s", msg);
+        vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
 }
 
-static void record_button_f(void *pvParameters){
-    const char TAG[] = "record_button";
-    uint8_t laststeadystate = HIGH;
-    uint8_t currentstate;
-    uint8_t lastbouncestate = HIGH;
-    uint64_t lastbouncetime = 0;
-    uint64_t currenttime;
-    gpio_set_pull_mode(i2c_record_button, GPIO_PULLUP_ONLY );
-    auto *sharedMpuData_p = (struct sharedData_t *const) pvParameters;
-    for (;;){
-//        ESP_LOGI(TAG, "level of Pin13 %d", gpio_get_level(i2c_record_button));
-        currentstate = gpio_get_level(i2c_record_button);
-        if (currentstate != lastbouncestate){
-            lastbouncetime = esp_timer_get_time();
-            lastbouncestate = currentstate;
-        }
-        currenttime = esp_timer_get_time();
-        if ((currenttime - lastbouncetime) > DEBOUNCE_TIME){
-            if (laststeadystate == HIGH && currentstate == LOW){
-                if (xSemaphoreTake(sharedMpuData_p->mutex, 50) == pdTRUE){
-                    ESP_LOGI(TAG, "take mutex");
-                    ((mpuData_t *const) sharedMpuData_p->data_p)->record_button = PRESS;
-                    ESP_LOGI(TAG, "record button was pressed");
-                    ESP_LOGI(TAG, "give mutex");
-                    xSemaphoreGive(sharedMpuData_p->mutex);
-                }
-            }
-//            else{
-//                if (xSemaphoreTake(sharedMpuData_p->mutex, 50) == pdTRUE){
-//                    ((mpuData_t *const) sharedMpuData_p->data_p)->record_button = RELEASE;
-//                    xSemaphoreGive(sharedMpuData_p->mutex);
-//                }
-//            }
-            laststeadystate = currentstate;
-        }
-    }
-    vTaskDelete(nullptr);
-}
+static void vTaskButton(void *pvParameters) {
+    const char TAG[] = "button_task";
+    auto *sharedButtonData_p = (struct sharedData_t *) pvParameters;
 
-static void stop_button_f(void *pvParameters){
-    const char TAG[] = "stop_button";
-    uint8_t laststeadystate = HIGH;
-    uint8_t currentstate;
-    uint8_t lastbouncestate = HIGH;
-    uint64_t lastbouncetime = 0;
-    uint64_t currenttime;
-    gpio_set_pull_mode(i2c_stop_button, GPIO_PULLUP_ONLY );
-    auto *sharedMpuData_p = (struct sharedData_t *const) pvParameters;
-    for (;;){
-        currentstate = gpio_get_level(i2c_stop_button);
-        if (currentstate != lastbouncestate){
-            lastbouncetime = esp_timer_get_time();
-            lastbouncestate = currentstate;
-        }
-        currenttime = esp_timer_get_time();
-        if ((currenttime - lastbouncetime) > DEBOUNCE_TIME){
-            if (laststeadystate == HIGH && currentstate == LOW){
-                if (xSemaphoreTake(sharedMpuData_p->mutex, 50) == pdTRUE){
-                    ESP_LOGI(TAG, "take mutex");
-                    ((mpuData_t *const) sharedMpuData_p->data_p)->stop_button = PRESS;
-                    ESP_LOGI(TAG, "stop button was pressed");
-                    ESP_LOGI(TAG, "give mutex");
-                    xSemaphoreGive(sharedMpuData_p->mutex);
-                }
-            }
-//            else{
-//                if (xSemaphoreTake(sharedMpuData_p->mutex, 50) == pdTRUE){
-//                    ((mpuData_t *const) sharedMpuData_p->data_p)->stop_button = RELEASE;
-//                    xSemaphoreGive(sharedMpuData_p->mutex);
-//                }
-//            }
-            laststeadystate = currentstate;
-        }
-    }
-    vTaskDelete(nullptr);
-}
+    TickType_t lastBounceTime = 0;
+    static int lastBounceState[3] = {LOW, LOW, LOW};
+    static int buttonStates[3] = {LOW, LOW, LOW};
+    gpio_set_pull_mode(record_button_pin, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(color_button_pin, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(move_button_pin, GPIO_PULLUP_ONLY);
 
-static void repeat_button_f(void *pvParameters){
-    const char TAG[] = "repeat_button";
-    uint8_t laststeadystate = HIGH;
-    uint8_t currentstate;
-    uint8_t lastbouncestate = HIGH;
-    uint64_t lastbouncetime = 0;
-    uint64_t currenttime;
-    gpio_set_pull_mode(i2c_repeat_button, GPIO_PULLUP_ONLY );
-    auto *sharedMpuData_p = (struct sharedData_t *const) pvParameters;
-    for (;;){
-        currentstate = gpio_get_level(i2c_repeat_button);
-        if (currentstate != lastbouncestate){
-            lastbouncetime = esp_timer_get_time();
-            lastbouncestate = currentstate;
-        }
-        currenttime = esp_timer_get_time();
-        if ((currenttime - lastbouncetime) > DEBOUNCE_TIME){
-            if (laststeadystate == HIGH && currentstate == LOW){
-                if (xSemaphoreTake(sharedMpuData_p->mutex, 50) == pdTRUE){
-                    ESP_LOGI(TAG, "take mutex");
-                    ((mpuData_t *const) sharedMpuData_p->data_p)->repeat_button = PRESS;
-                    ESP_LOGI(TAG, "repeat button was pressed");
-                    ESP_LOGI(TAG, "give mutex");
-                    xSemaphoreGive(sharedMpuData_p->mutex);
-                }
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    for (;;) {
+        for (int button_idx = 0; button_idx < 3; button_idx++) {
+
+            // read the level of button pin, and turn the voltage level to logical truth
+            int currentState = (1 - gpio_get_level(button_pins[button_idx]));
+
+            if (currentState != lastBounceState[button_idx]) {
+                lastBounceTime = xLastWakeTime;
+                lastBounceState[button_idx] = currentState;
             }
-//            else{
-//                if (xSemaphoreTake(sharedMpuData_p->mutex, 50) == pdTRUE){
-//                    ((mpuData_t *const) sharedMpuData_p->data_p)->repeat_button = RELEASE;
-//                    xSemaphoreGive(sharedMpuData_p->mutex);
-//                }
-//            }
-            laststeadystate = currentstate;
+            // output the last state until the signal is stable for the whole DEBOUNCE_TIME period.
+            if ((xTaskGetTickCount() - lastBounceTime) > DEBOUNCE_TIME) {
+                buttonStates[button_idx] = currentState;
+            }
+
         }
+        ESP_LOGD(TAG, "take mutex");
+        if (xSemaphoreTake(sharedButtonData_p->mutex, 50) == pdTRUE) {
+            for (int button_idx = 0; button_idx < 3; button_idx++) {
+                (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx] = buttonStates[button_idx];
+            }
+            xSemaphoreGive(sharedButtonData_p->mutex);
+//            ESP_LOGI(TAG, "Button states (%d, %d, %d)", buttonStates[0], buttonStates[1], buttonStates[2]);
+            ESP_LOGD(TAG, "give mutex");
+        } else {
+            ESP_LOGD(TAG, "fail to take mutex");
+        }
+        vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
 }
@@ -290,28 +232,40 @@ extern "C" void app_main() {
     // Initialize wifi and connect
     wifi_init_sta();
 
-    auto *mpuData = (struct mpuData_t *) malloc(sizeof(struct mpuData_t));
-    auto *sharedMpuData = (sharedData_t *) malloc(sizeof(sharedData_t));
+    auto *sharedMpuData_p = (sharedData_t *) malloc(sizeof(sharedData_t));
+    sharedMpuData_p->mutex = xSemaphoreCreateMutex();
+    auto *mpuData_p = (mpuData_t *) malloc(sizeof(mpuData_t));
+    sharedMpuData_p->data_p = (void *) mpuData_p;
 
-    sharedMpuData->mutex = xSemaphoreCreateMutex();
-    sharedMpuData->data_p = (void *const) mpuData;
+    auto *sharedButtonData_p = (sharedData_t *) malloc(sizeof(sharedData_t));
+    sharedButtonData_p->mutex = xSemaphoreCreateMutex();
+    // pointer to a 3 length buttonsData_p array
+    auto *buttonsData_p = (buttonData_t(*)[]) malloc(sizeof(buttonData_t) * 3);
+    sharedButtonData_p->data_p = (void *) buttonsData_p;
 
+    auto *tcpClientParameter_p = (tcpClientParameter_t *) malloc(sizeof(tcpClientParameter_t));
+    tcpClientParameter_p->mpuData_p = sharedMpuData_p;
+    tcpClientParameter_p->buttonsData_p = sharedButtonData_p;
 
     TaskHandle_t mpu6050_handle;
-    xTaskCreate(vTaskMpu6050, "vTaskMpu6050", 4096, sharedMpuData, 2, &mpu6050_handle);
-
+    xTaskCreate(vTaskMpu6050, "vTaskMpu6050", 4096, sharedMpuData_p, 2, &mpu6050_handle);
 
     TaskHandle_t tcp_client_handle;
-    xTaskCreate(vTaskTcpClient, "vTaskTcpClient", 4096, sharedMpuData, 2, &tcp_client_handle);
+    xTaskCreate(vTaskTcpClient, "vTaskTcpClient", 4096, tcpClientParameter_p, 2, &tcp_client_handle);
 
-    TaskHandle_t record_button_handle;
-    xTaskCreate(record_button_f, "record_button_f", 4096, sharedMpuData, 1, &record_button_handle);
+    TaskHandle_t button_handle;
+    xTaskCreate(vTaskButton, "vTaskButton", 4096, sharedButtonData_p, 2, &button_handle);
 
-    TaskHandle_t stop_button_handle;
-    xTaskCreate(stop_button_f, "stop_button_f", 4096, sharedMpuData, 2, &stop_button_handle);
 
-    TaskHandle_t repeat_button_handle;
-    xTaskCreate(repeat_button_f, "repeat_button_f", 4096, sharedMpuData, 2, &repeat_button_handle);
+
+    //    TaskHandle_t record_button_handle;
+//    xTaskCreate(record_button_f, "record_button_f", 4096, sharedMpuData_p, 1, &record_button_handle);
+//
+//    TaskHandle_t move_button_handle;
+//    xTaskCreate(stop_button_f, "stop_button_f", 4096, sharedMpuData_p, 2, &move_button_handle);
+//
+//    TaskHandle_t repeat_button_handle;
+//    xTaskCreate(repeat_button_f, "repeat_button_f", 4096, sharedMpuData_p, 2, &repeat_button_handle);
 
 //    TaskHandle_t tcp_server_handle;
 //    xTaskCreate(tcp_server_task, "tcp_server", 4096, (void *) AF_INET, 5, &tcp_server_handle);

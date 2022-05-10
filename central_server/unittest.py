@@ -1,14 +1,19 @@
-from control import CircularQueue
-
-cq = CircularQueue(5)
-for i in range(10):
-    cq.put(i, block=False)
-    print(cq.queue)
-
-# pygame.mixer.init()
+# from control import CircularQueue
 #
-# track = pygame.mixer.music.load(r"D:\User\Dashujv\语音分析\data\声声慢.mp3")
-# pygame.mixer.music.play()
+# cq = CircularQueue(5)
+# for i in range(10):
+#     print(cq.queue)
+#     cq.put(i, block=False)
 #
-# pygame.mixer.music.pause() #暂停
-# pygame.mixer.music.unpause()#取消暂停
+import time
+
+from music_player import MusicPlayer
+
+mp = MusicPlayer(r"D:\NextcloudRoot\course\ECE445\ECE445Project\central_server\music")
+
+mp.play()
+time.sleep(10)
+mp.pause()
+time.sleep(5)
+mp.unpause()
+time.sleep(10)

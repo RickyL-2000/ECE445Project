@@ -1,10 +1,12 @@
 from utils.channel import Channel
 from utils.config import PC_IP, DYNAMICS_PORT, LIGHT_MOCK, LIGHT_PORT
 import time
+import parse
 
 
 def recv(msg):
-    print(msg)
+    theta, phi = parse.parse("({:f}, {:f})", msg.split(", (")[0])
+    print(f"{theta:.2f}, {phi:.2f}")
 
 
 c = Channel("mock_light")
