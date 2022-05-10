@@ -148,8 +148,7 @@ void dummy_control_task(void *pvParameters) {
         xQueueReceive(commandQueues->servoQueue, &roll, 0);
         xQueueReceive(commandQueues->stepQueue, &pitch, 0);
         xQueueReceive(commandQueues->ledQueue, &ledCommend, 0);
-        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %d,%d,%d", pitch, roll, ledCommend.R, ledCommend.G,
-                 ledCommend.B);
+        // ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %d,%d,%d", pitch, roll, ledCommend.R, ledCommend.G, ledCommend.B);
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -189,62 +188,23 @@ void dummy_led_task(void *pvParameters) {
 
 void dummy_servo_task(void *pvParameters) {
     // static char TAG[] = "dummy_servo_task";
-    int servo_type = DS3230;
+    int servo_type = DS3218;
 
-    // DS3218
-    if (servo_type == DS3218) {
-        static char TAG[] = "dummy_servo_task DS3218";
-        Servo servo3218(servo_type, SERVO_DS3230_GPIO,
-                        MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
-        for (;;) {
-            for (int angle = -SERVO_MAX_DEGREE_DS3218; angle < SERVO_MAX_DEGREE_DS3218; angle += 10) {
-                ESP_LOGI(TAG, "Angle of rotation: %d", angle);
-                ESP_ERROR_CHECK(servo3218.set_angle(angle));
-                vTaskDelay(pdMS_TO_TICKS(500));
-            }
-            for (int angle = SERVO_MAX_DEGREE_DS3218; angle > -SERVO_MAX_DEGREE_DS3218; angle -= 10) {
-                ESP_LOGI(TAG, "Angle of rotation: %d", angle);
-                ESP_ERROR_CHECK(servo3218.set_angle(angle));
-                vTaskDelay(pdMS_TO_TICKS(500));
-            }
-            vTaskDelay(pdMS_TO_TICKS(2000));
+    static char TAG[] = "dummy_servo_task DS3218";
+    Servo servo3218(servo_type, SERVO_DS3230_GPIO,
+                    MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
+    for (;;) {
+        for (int angle = -SERVO_MAX_DEGREE_DS3218; angle < SERVO_MAX_DEGREE_DS3218; angle += 10) {
+            ESP_LOGI(TAG, "Angle of rotation: %d", angle);
+            ESP_ERROR_CHECK(servo3218.set_angle(angle));
+            vTaskDelay(pdMS_TO_TICKS(500));
         }
-    } else if (servo_type == DS3230) {
-        // DS3230
-        static char TAG[] = "dummy_servo_task DS3230";
-        Servo servo3230(servo_type, SERVO_DS3230_GPIO,
-                        MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
-        for (;;) {
-            for (int angle = -SERVO_MAX_DEGREE_DS3230; angle < SERVO_MAX_DEGREE_DS3230; angle += 10) {
-                ESP_LOGI(TAG, "Angle of rotation: %d %d", angle, servo3230.servo_angle);
-                ESP_ERROR_CHECK(servo3230.set_angle(angle));
-                vTaskDelay(pdMS_TO_TICKS(500));
-            }
-            for (int angle = SERVO_MAX_DEGREE_DS3230; angle > -SERVO_MAX_DEGREE_DS3230; angle -= 10) {
-                ESP_LOGI(TAG, "Angle of rotation: %d %d", angle, servo3230.servo_angle);
-                ESP_ERROR_CHECK(servo3230.set_angle(angle));
-                vTaskDelay(pdMS_TO_TICKS(500));
-            }
-            vTaskDelay(pdMS_TO_TICKS(2000));
-
-            // ESP_ERROR_CHECK(servo3230.set_angle(-180));
-
-            // vTaskDelay(pdMS_TO_TICKS(1000));
-            // ESP_ERROR_CHECK(servo3230.set_angle(-100));
-            // vTaskDelay(pdMS_TO_TICKS(1000));
-            // ESP_ERROR_CHECK(servo3230.set_angle(0));
-            // for (int angle = -SERVO_MAX_DEGREE_DS3230; angle < SERVO_MAX_DEGREE_DS3230; angle += 30) {
-            //     ESP_LOGI(TAG, "Angle of rotation: %d", angle);
-            //     ESP_ERROR_CHECK(servo3230.set_angle(30));
-            //     vTaskDelay(pdMS_TO_TICKS(500));
-            // }
-            // for (int angle = SERVO_MAX_DEGREE_DS3230; angle > -SERVO_MAX_DEGREE_DS3230; angle -= 30) {
-            //     ESP_LOGI(TAG, "Angle of rotation: %d", angle);
-            //     ESP_ERROR_CHECK(servo3230.set_angle(-30));
-            //     vTaskDelay(pdMS_TO_TICKS(500));
-            // }
-            // vTaskDelay(pdMS_TO_TICKS(1000));
+        for (int angle = SERVO_MAX_DEGREE_DS3218; angle > -SERVO_MAX_DEGREE_DS3218; angle -= 10) {
+            ESP_LOGI(TAG, "Angle of rotation: %d", angle);
+            ESP_ERROR_CHECK(servo3218.set_angle(angle));
+            vTaskDelay(pdMS_TO_TICKS(500));
         }
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 
