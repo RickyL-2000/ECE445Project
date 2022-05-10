@@ -223,12 +223,12 @@ class Control:
         # self.music_player.play()
         recv_t = Thread(target=self.recv, daemon=True)
         send_t = Thread(target=self.send, daemon=True)
-        monitor_t = Thread(target=self.monitor, daemon=True)
+        # monitor_t = Thread(target=self.monitor, daemon=True)
 
         recv_t.start()
         send_t.start()
-        monitor_t.start()
+        # monitor_t.start()
 
         recv_t.join()
         send_t.join()
-        monitor_t.join()
+        # monitor_t.join()

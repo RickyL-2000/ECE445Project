@@ -174,94 +174,54 @@ void led_control_task(void *pvParameters) {
         // Flush RGB values to LEDs
         ESP_ERROR_CHECK(strip->refresh(strip, 100));
         vTaskDelay(pdMS_TO_TICKS(10));
-        strip->clear(strip, 50);
-        vTaskDelay(pdMS_TO_TICKS(10));
+        // FIXME: the timing of clear needs to be decided,
+        //  otherwise the light will not be turned off even if the task is done
+        // strip->clear(strip, 50);
+        // vTaskDelay(pdMS_TO_TICKS(10));
 
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
 }
 
-
-void dummy_led_task(void *pvParameters) {
-    static char TAG[] = "dummy_led_task";
-
-    led_strip_t *strip = led_strip_init(RMT_TX_CHANNEL, RMT_TX_GPIO, LED_NUMBER);
-
-    // Show simple rainbow chasing pattern
-    ESP_LOGI(TAG, "LED Rainbow Chase Start");
-    uint32_t red = 0;
-    uint32_t green = 0;
-    uint32_t blue = 0;
-    uint16_t hue = 0;
-    uint16_t start_rgb = 0;
-    for (;;) {
-        for (int i = 0; i < 3; i++) {
-            for (int j = i; j < LED_NUMBER; j += 3) {
-                // Build RGB values
-                hue = j * 360 / LED_NUMBER + start_rgb;
-                led_strip_hsv2rgb(hue, 100, 100, &red, &green, &blue);
-                // Write RGB values to strip driver
-                // ESP_LOGI(TAG, "%d", j);
-                ESP_ERROR_CHECK(strip->set_pixel(strip, j, red, green, blue));
-            }
-            // Flush RGB values to LEDs
-            ESP_ERROR_CHECK(strip->refresh(strip, 100));
-            vTaskDelay(pdMS_TO_TICKS(10));
-            strip->clear(strip, 50);
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-        start_rgb += 60;
-    }
-}
-
-void servo_control_task(void *pvParameters) {
-    static char TAG[] = "servo_control_task";
+void servo_pitch_task(void *pvParameters) {
+    static char TAG[] = "servo_pitch_task";
     auto *commandQueues = (commandQueues_t *) pvParameters;
 
-    float pitch, yaw;
+    float pitch;
 
-    Servo servo_yaw(DS3218, SERVO_YAW_GPIO,
-                    MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
     Servo servo_pitch(DS3218, SERVO_PITCH_GPIO,
-                    MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
+                      MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
 
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
         xQueueReceive(commandQueues->pitchQueue, &pitch, 0);
-        xQueueReceive(commandQueues->yawQueue, &yaw, 0);
-        ESP_LOGI(TAG, "receive from servo queue: %.2f, %.2f", pitch, yaw)
         ESP_ERROR_CHECK(servo_pitch.set_angle((int)pitch));
-        vTaskDelay(pdMS_TO_TICKS(50));
-        ESP_ERROR_CHECK(servo_yaw.set_angle((int)yaw));
-        vTaskDelay(pdMS_TO_TICKS(50));
 
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
 }
 
-void dummy_servo_task(void *pvParameters) {
-    // static char TAG[] = "dummy_servo_task";
-    int servo_type = DS3218;
+void servo_yaw_task(void *pvParameters) {
+    static char TAG[] = "servo_yaw_task";
+    auto *commandQueues = (commandQueues_t *) pvParameters;
 
-    static char TAG[] = "dummy_servo_task DS3218";
-    Servo servo3218(servo_type, SERVO_DS3230_GPIO,
+    float yaw;
+
+    Servo servo_yaw(DS3218, SERVO_YAW_GPIO,
                     MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
+
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        for (int angle = -SERVO_MAX_DEGREE_DS3218; angle < SERVO_MAX_DEGREE_DS3218; angle += 10) {
-            ESP_LOGI(TAG, "Angle of rotation: %d", angle);
-            ESP_ERROR_CHECK(servo3218.set_angle(angle));
-            vTaskDelay(pdMS_TO_TICKS(500));
-        }
-        for (int angle = SERVO_MAX_DEGREE_DS3218; angle > -SERVO_MAX_DEGREE_DS3218; angle -= 10) {
-            ESP_LOGI(TAG, "Angle of rotation: %d", angle);
-            ESP_ERROR_CHECK(servo3218.set_angle(angle));
-            vTaskDelay(pdMS_TO_TICKS(500));
-        }
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        xQueueReceive(commandQueues->yawQueue, &yaw, 0);
+        ESP_ERROR_CHECK(servo_yaw.set_angle((int)yaw));
+
+        vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
+    vTaskDelete(nullptr);
 }
 
 extern "C" void app_main() {
@@ -318,9 +278,17 @@ extern "C" void app_main() {
     xTaskCreate(tcp_server_task, "tcp_server", 4096,
                 tcpServerTaskParameters, 5, &tcp_server_handle);
 
-    TaskHandle_t servo_control_handle;
-    xTaskCreate(servo_control_task, "servo_control", 4096,
-                commandQueues_p, 5, &servo_control_handle);
+    TaskHandle_t led_control_handle;
+    xTaskCreate(led_control_task, "led_control", 4096,
+                tcpServerTaskParameters, 5, &led_control_handle);
+
+    TaskHandle_t servo_pitch_handle;
+    xTaskCreate(servo_pitch_task, "servo_pitch", 4096,
+                commandQueues_p, 5, &servo_pitch_handle);
+
+    TaskHandle_t servo_yaw_handle;
+    xTaskCreate(servo_yaw_task, "servo_yaw", 4096,
+                commandQueues_p, 5, &servo_yaw_handle);
 
     // TaskHandle_t dummy_control_handle;
     // xTaskCreate(dummy_control_task, "dummy_control", 4096,
