@@ -2,6 +2,7 @@
 #include "tcp_server.h"
 #include "ws2812.hpp"
 #include "servo.hpp"
+// #include "can.hpp"
 
 #include "nvs_flash.h"
 
@@ -188,7 +189,7 @@ void dummy_led_task(void *pvParameters) {
 
 void dummy_servo_task(void *pvParameters) {
     // static char TAG[] = "dummy_servo_task";
-    int servo_type = DS3218;
+    int servo_type = DS3230;
 
     // DS3218
     if (servo_type == DS3218) {
@@ -264,7 +265,7 @@ extern "C" void app_main() {
    // xTaskCreate(dummy_led_task, "dummy_led", 4096,
    //             commandQueues_p, 5, &dummy_led_handle);
 
-    // // test dummy servo
+    // test dummy servo
     // auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
     // TaskHandle_t dummy_servo_handle;
     // xTaskCreate(dummy_servo_task, "dummy_servo", 4096,
