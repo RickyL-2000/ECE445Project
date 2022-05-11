@@ -1,4 +1,6 @@
 # %%
+import torch
+from torch import package
 import librosa
 import librosa.display
 import numpy as np
@@ -8,12 +10,13 @@ import os
 import sys
 
 from utils import *
+from mood_recog.inference import inference
 
 # %%
 f_path = os.path.join("audios", "GALA - Young For You.mp3")
-# y, fs = load_audio(f_path)
+y, fs = load_audio(f_path)
 
-base_dir = 'D:/OneDrive - International Campus, Zhejiang University/08_2022_SPRING/ECE445/ECE445Project/music_analyzer'
+base_dir = 'D:/ECE445Project/music_analyzer'
 
 # %%
 def plot_beats(y, fs, begin=0, end=10, hop_length=512):
@@ -106,9 +109,9 @@ def main(f_path, fs, hop_length=512):
             f.write(f"{int(r[i])} {int(g[i])} {int(b[i])}\n")
 
 # %%
-if __name__ == "__main__":
-    main(f_path=f_path, fs=22050, hop_length=512)
-    output2C(base_dir)
+# if __name__ == "__main__":
+#     main(f_path=f_path, fs=22050, hop_length=512)
+#     output2C(base_dir)
 
 # %%
 sys.exit()
@@ -174,26 +177,8 @@ plt.imshow(color_matrix, cmap='hsv')
 plt.show()
 
 # %%
-# try filter
-color_map_ = np.convolve(color_map, np.ones(16) / 16, mode='same')
-plt.plot(times, color_map_)
-plt.show()
-
-# %%
-# try convolve beat sequence
-plt.figure(figsize=(9, 4))
-beat_sequence_ = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
-plt.vlines(times[beats], 0, 1, color='r', linestyles='--', label='beat')
-plt.plot(times, beat_sequence_, label='smoothed beat')
-plt.legend()
-plt.show()
-
-# %%
-plt.plot(times, np.hamming(times.shape[0]), lw=6)
-plt.show()
-
-# %%
 # try plot together
+# try emotion recog
 begin = 0
 end = 10
 hop_length = 512
@@ -223,21 +208,37 @@ times = librosa.times_like(energy, sr=fs, hop_length=hop_length) + begin
 ax[1].plot(times, energy, color='y', label='energy')
 ax[1].set_xlim(begin, end)
 
-plt.legend()
+# plt.legend()
+
+# neural network
+y__ = y[:]
+mel = librosa.feature.melspectrogram(y=y__, sr=fs, n_fft=512, hop_length=256, win_length=512, fmax=8000)
+mel = librosa.power_to_db(mel, ref=np.max)
+imp = package.PackageImporter(f"{base_dir}/mood_recog/model.pt")
+model = imp.load_pickle("emotion_recog", "model.pt")
+emotion = inference(model, mel)
 
 # color map
-color_map = np.zeros_like(energy)
+hue_map = np.zeros_like(energy)
+value_map = np.zeros_like(energy)
 beat_sequence = np.zeros_like(energy)
 beat_sequence[beats] = 1.0
 beat_gap = 60 / tempo * fs / hop_length
 energy /= np.max(energy)
 beat_soft = np.convolve(beat_sequence, np.hamming(2 * beat_gap * 0.4), mode='same')
-color_map += energy + 0.3 * beat_soft
-color_map /= np.max(color_map)
-color_map = np.convolve(color_map, np.ones(8) / 8, mode='same')  # filter
-color_matrix = np.tile(color_map, (int(color_map.shape[0] / 4), 1))
+hue_map += energy + 0.6 * beat_soft
+hue_map = np.convolve(hue_map, np.ones(32) / 32, mode='same')  # filter
+hue_map /= np.max(hue_map)
+# hue_map = np.convolve(hue_map, np.ones(32) / 32, mode='same')  # filter
+hue_map *= 360
+value_map += energy + 1 * beat_soft
+value_map = np.convolve(value_map, np.ones(32) / 32, mode='same')  # filter
+value_map /= np.max(value_map)
+
+color_matrix = np.tile(hue_map, (int(hue_map.shape[0] / 4), 1))
 ax[2].imshow(color_matrix, aspect='auto', cmap='hsv')
 
+plt.suptitle(f"emotion classified as Q{emotion+1}", fontdict={'weight': 'normal', 'size': 100})
 plt.show()
 
 # %% try output

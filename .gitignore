@@ -10,5 +10,7 @@ cmake-build-debug/
 cal500data
 emotifymusic
 
-# trained model
+# training checkpoints
 music_analyzer/mood_recog/checkpoints/checkpoint_*/*.pkl
+music_analyzer/mood_recog/checkpoints/checkpoint_*/*.pt
+music_analyzer/mood_recog/model.pt
