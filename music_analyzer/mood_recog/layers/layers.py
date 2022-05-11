@@ -6,6 +6,8 @@ class Conv1d(torch.nn.Conv1d):
     def __init__(self, *args, **kwargs):
         """Initialize Conv1d module."""
         super(Conv1d, self).__init__(*args, **kwargs)
+        # if reset:
+        #     self.reset_parameters()
 
     def reset_parameters(self):
         """Reset parameters."""

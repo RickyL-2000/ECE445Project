@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 import torch.utils.data
 from tensorboardX import SummaryWriter
 
+from sklearn.metrics import r2_score, precision_score, recall_score, f1_score, roc_auc_score
+
 import os
 import yaml
 import logging
@@ -38,7 +40,7 @@ class Trainer(object):
         self.data_loader = data_loader
         self.sampler = sampler
         self.model = model
-        self.criterion = criterion[config['criterion']]
+        self.criterion = criterion
         self.loss_fn = criterion[config['loss_fn']]
         self.optimizer = optimizer[config['optimizer']]
         self.scheduler = scheduler[config['scheduler']]
@@ -52,20 +54,27 @@ class Trainer(object):
         self.total_train_loss = defaultdict(float)
         self.total_eval_loss = defaultdict(float)
         self.total_eval_score = defaultdict(float)
+        self.tensor_record = defaultdict(str)
 
         self.tqdm = None
         self.finish_train = False
 
     def run(self):
+        self.logger.debug(f"distributed: {self.config['distributed']}")
         self.tqdm = tqdm(initial=self.steps,
                          total=self.config["train_max_steps"],
                          desc="[train]")
+        # visualize model
+        fake_input = torch.randn(1, 80, 5000).to(self.device)
+        self.writer.add_graph(self.model, fake_input)
+
         while True:
             self._train_epoch()
 
             if self.finish_train:
                 break
         self.tqdm.close()
+        self.writer.close()
         self.logger.info("Finish training")
 
     def _train_epoch(self):
@@ -84,14 +93,19 @@ class Trainer(object):
         self.epochs += 1
         self.logger.info(f"Epochs: {self.epochs} | Steps: {self.steps}")
 
+        # try:
         if self.config["distributed"]:
             self.sampler["train"].set_epoch(self.epochs)
+        # except AttributeError as err:
+        #     self.logger.debug(f"distributed: {self.config['distributed']}")
+        #     self.logger.debug(err)
+        #     sys.exit()
 
     def _train_step(self, batch):
         self.optimizer.zero_grad()
 
         mel = batch["mel"].to(torch.float32).to(self.device)
-        y = batch["label"].to(torch.float32).to(self.device)
+        y = batch["label"].to(self.device)
 
         y_ = self.model(mel)
 
@@ -99,7 +113,7 @@ class Trainer(object):
         loss.backward()
         self.optimizer.step()
 
-        self.total_train_loss["train/onset_loss"] += loss.item()
+        self.total_train_loss["train/loss"] += loss.item()
 
         self.steps += 1
         self.tqdm.update(1)
@@ -118,46 +132,68 @@ class Trainer(object):
         # average loss
         for key in self.total_eval_loss.keys():
             self.total_eval_loss[key] /= batch_idx
-            self.logger.info(f"(Steps: {self.steps}) {key} = {self.total_eval_loss[key]:.4f}.")
+            self.logger.info(f"(ver: {self.version}) (Steps: {self.steps}) {key} = {self.total_eval_loss[key]:.4f}.")
 
         # average score
         for key in self.total_eval_score.keys():
             self.total_eval_score[key] /= batch_idx
-            self.logger.info(f"{key} = {self.total_eval_score[key]:.4f}.")
+            self.logger.info(f"(ver: {self.version}) {key} = {self.total_eval_score[key]:.4f}.")
 
         # record
         self._write_to_tensorboard(self.total_eval_loss)
         self._write_to_tensorboard(self.total_eval_score)
+        if self.epochs % 10 == 0:
+            self._write_to_tensorboard(self.tensor_record, dtype="text")
 
         # reset
         self.total_eval_loss = defaultdict(float)
         self.total_eval_score = defaultdict(float)
+        if self.epochs % 10 == 0:
+            self.tensor_record = defaultdict(str)
 
         # restore mode
         self.model.train()
 
     def _eval_step(self, batch):
         mel = batch["mel"].to(torch.float32).to(self.device)
-        y = batch["label"].to(torch.float32).to(self.device)
+        y = batch["label"].to(self.device)
 
         y_ = self.model(mel)
 
         loss = self.loss_fn(y_, y)
 
-        self.total_eval_loss["eval/onset_loss"] += loss.item()
+        self.total_eval_loss["eval/loss"] += loss.item()
 
         # NOTE: map y_ to [0, 1]
         if self.config["loss_fn"] == "BCEWithLogits":
-            y_ = F.sigmoid(y_)
+            y_ = torch.sigmoid(y_)  # nn.functional.sigmoid is deprecated. Use torch.sigmoid instead
 
         # compute score
-        self.total_eval_loss["eval/score"] += self.criterion(y, y_)
+        # MSE
+        # self.total_eval_score[f"eval/{self.config['criterion']}"] += self.criterion(y, y_)
+        # R2
+        # self.total_eval_score["eval/R2"] += r2_score(y.detach().cpu().numpy(), y_.detach().cpu().numpy())
+
+        # record some output
+        if self.epochs % 10 == 0:
+            self.tensor_record["record/y"] = str(y.detach().cpu().numpy())
+            self.tensor_record["record/y_hat"] = str(y_.detach().cpu().numpy())
+
+        # make y_ into a 1-dim array
+        y = y.detach().cpu().numpy()
+        y_ = torch.argmax(y_, -1).detach().cpu().numpy()
+        # precision, recall, f1
+        # self.total_eval_score["eval/precision"] += precision_score(y, y_, average="micro")
+        # self.total_eval_score["eval/recall"] += recall_score(y, y_, average="micro")
+        self.total_eval_score["eval/f1"] += f1_score(y, y_, average="micro")
+        # auc
+        # self.total_eval_score["eval/auc"] += roc_auc_score(y, y_, average="macro", multi_class='ovr')
 
     def _check_log_interval(self):
         if self.steps % self.config['log_interval_steps'] == 0:
             for key in self.total_train_loss.keys():
                 self.total_train_loss[key] /= self.config['log_interval_steps']
-                self.logger.info(f'(Steps: {self.steps}) {key} = {self.total_train_loss[key]:.4f}.')
+                self.logger.info(f'(ver: {self.version}) (Steps: {self.steps}) {key} = {self.total_train_loss[key]:.4f}.')
             self._write_to_tensorboard(self.total_train_loss)
 
             # reset
@@ -176,9 +212,13 @@ class Trainer(object):
         if self.steps >= self.config['train_max_steps']:
             self.finish_train = True
 
-    def _write_to_tensorboard(self, item):
-        for key, value in item.items():
-            self.writer.add_scalar(key, value, self.steps)
+    def _write_to_tensorboard(self, item, dtype="scalar"):
+        if dtype == "scalar":
+            for key, value in item.items():
+                self.writer.add_scalar(key, value, self.steps)
+        elif dtype == "text":
+            for key, value in item.items():
+                self.writer.add_text(key, value, self.steps)
 
     def save_checkpoint(self, checkpoint_path, f_name):
         state_dict = {
@@ -216,8 +256,8 @@ def main():
                         help="logging level. higher is more logging. (default=1)")
     parser.add_argument("--rank", "--local_rank", default=0, type=int,
                         help="rank for distributed training. no need to explicitly specify.")
-    parser.add_argument("--dataset_name", '-d', type=str, default="emotifymusic",
-                        help="Dataset name")
+    # parser.add_argument("--dataset_name", '-d', type=str, default="emotifymusic",
+    #                     help="Dataset name")
     args = parser.parse_args()
 
     # ----------------- load config ----------------- #
@@ -225,11 +265,12 @@ def main():
         config = yaml.load(f, Loader=yaml.Loader)
     config.update(vars(args))
     # update checkpoint path
-    config['trainer']['checkpoint_path'] += f"/checkpoint_{config['version']}"
+    if config['trainer']['checkpoint_path'] == "checkpoints":
+        config['trainer']['checkpoint_path'] += f"/checkpoint_{config['version']}"
     mkdir(f"{config['trainer']['checkpoint_path']}")
     # save config
     with open(f"{config['trainer']['checkpoint_path']}/config.yaml", 'w') as f:
-        yaml.dump(config, f, Dumper=yaml.Dumper)
+        yaml.dump(config, f, Dumper=yaml.Dumper, sort_keys=False)
 
     # ----------------- set logger ----------------- #
     logger = logging.getLogger(__file__)
@@ -286,7 +327,8 @@ def main():
             torch.distributed.init_process_group(backend="nccl", init_method="env://")
 
     # --------------------------------------- dataset ---------------------------------------- #
-    dataset = EmotifyDataset(config=config['dataset'][config['dataset_name']])
+    # dataset = EmotifyDataset(config=config['dataset'][config['dataset_name']])
+    dataset = FourQDataset(config=config['dataset'][config['dataset_name']])
 
     train_size = int(len(dataset) * config['dataset'][config['dataset_name']]['train_eval_split'])
     eval_size = len(dataset) - train_size
@@ -298,13 +340,15 @@ def main():
     logger.info(f"The number of evaluation files = {eval_size}")
 
     dataset = {'train': train_dataset, 'eval': eval_dataset}
-    collator = EmotifyCollator()
+    # collator = EmotifyCollator()
+    collator = FourQCollator()
 
     # --------------------------------------- criterion ---------------------------------------- #
     criterion = {
         'MSE': torch.nn.MSELoss(),
         'BCE': torch.nn.BCELoss(),
-        'BCEWithLogits': torch.nn.BCEWithLogitsLoss()
+        'BCEWithLogits': torch.nn.BCEWithLogitsLoss(),
+        'CE': torch.nn.CrossEntropyLoss()
     }
 
     # --------------------------------------- define models ---------------------------------------- #
