@@ -177,6 +177,7 @@ plt.imshow(color_matrix, cmap='hsv')
 plt.show()
 
 # %%
+# ----------------------------------------------------------------------------------
 # try plot together
 # try emotion recog
 begin = 0
