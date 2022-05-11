@@ -1,0 +1,84 @@
+version: '1_21'
+rank: 0
+using_gpu: true
+model:
+  mel_enc:
+    in_channels: 80
+    out_channels: 256
+    kernel_size: 3
+    resnet_n_layer: 3
+    bias: true
+    maxpool_size: 5
+    reset: true
+    batchnorm: true
+  lstm:
+    input_size: 256
+    hidden_size: 256
+    num_layers: 2
+    bias: true
+    batch_first: true
+    bidirectional: true
+  linear:
+    in_features: 1024
+    hidden_features: 256
+    out_features: 4
+    bias: true
+    batchnorm: true
+dataset_name: 4Q
+dataset:
+  seed: 777
+  emotifymusic:
+    path: emotifymusic
+    start_idx: 1
+    end_idx: 400
+    genres:
+    - classical
+    - rock
+    - electronic
+    - pop
+    train_eval_split: 0.8
+    batch_size: 16
+    num_workers: 16
+    allow_cache: true
+    pin_memory: true
+  4Q:
+    path: 4Q/MER_audio_taffc_dataset
+    category:
+    - Q1
+    - Q2
+    - Q3
+    - Q4
+    train_eval_split: 0.8
+    batch_size: 32
+    num_workers: 8
+    allow_cache: false
+    pin_memory: true
+  your_dataset_name:
+    your_params: 123456
+    train_eval_split: 0.8
+    batch_size: 8
+    num_workers: 16
+    allow_cache: true
+    pin_memory: true
+trainer:
+  checkpoint_path: checkpoints/checkpoint_1_21
+  distributed: false
+  optimizer: Adam
+  optimizer_params:
+    Adam:
+      lr: 0.0001
+      eps: 1.0e-06
+      weight_decay: 0.0
+  scheduler: StepLR
+  scheduler_params:
+    StepLR:
+      step_size: 10000
+      gamma: 0.5
+  train_max_steps: 20000
+  save_interval_steps: 300
+  eval_interval_steps: 100
+  log_interval_steps: 10
+  loss_fn: CE
+config: config/mood_clf_config.yaml
+resume: ''
+verbose: 1

@@ -9,3 +9,6 @@ cmake-build-debug/
 # dataset
 cal500data
 emotifymusic
+
+# trained model
+music_analyzer/mood_recog/checkpoints/checkpoint_*/*.pkl
