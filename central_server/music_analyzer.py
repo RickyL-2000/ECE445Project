@@ -4,6 +4,7 @@ import torch
 from torch import package
 import librosa
 import numpy as np
+import math
 
 from utils.signal import *
 
@@ -29,7 +30,7 @@ class MusicAnalyzer:
         self.color_queue = queue.Queue(-1)
 
         y, fs = load_audio(f_path)
-        hue_map = np.zeros(np.ceil(len(y) / hop_length, dtype=int))
+        hue_map = np.zeros(math.ceil(len(y)/hop_length))
         saturation_map = np.zeros_like(hue_map)
         value_map = np.zeros_like(hue_map)
 
@@ -73,6 +74,6 @@ class MusicAnalyzer:
         r, g, b = hsv2rgb(hue_map, saturation_map, value_map)
 
         for R, G, B in zip(r, g, b):
-            self.color_queue.put((np.round(R), np.round(G), np.round(B)))
+            self.color_queue.put((int(R), int(G), int(B)))
 
         print("Analysis done.")
