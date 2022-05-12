@@ -14,6 +14,7 @@ class MusicAnalyzer:
         self.recognizer = imp.load_pickle("emotion_recog", "model.pt")
 
         self.color_queue = queue.Queue(-1)
+        self.sr = 0.0
 
     def emotion_recog(self, mel, channel=80):
         mel = mel[:channel, :]
@@ -33,6 +34,8 @@ class MusicAnalyzer:
         hue_map = np.zeros(math.ceil(len(y)/hop_length))
         saturation_map = np.zeros_like(hue_map)
         value_map = np.zeros_like(hue_map)
+        times = librosa.times_like(hue_map, sr=fs, hop_length=hop_length)   # timestamp sequence
+        self.sr = fs / hop_length
 
         # ----- tempo and beats ----- #
         onset_env = librosa.onset.onset_strength(y, fs, aggregate=np.median)
@@ -73,7 +76,7 @@ class MusicAnalyzer:
 
         r, g, b = hsv2rgb(hue_map, saturation_map, value_map)
 
-        for R, G, B in zip(r, g, b):
-            self.color_queue.put((int(R), int(G), int(B)))
+        for R, G, B, t in zip(r, g, b, times):
+            self.color_queue.put(((int(R), int(G), int(B)), t))
 
         print("Analysis done.")

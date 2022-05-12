@@ -176,7 +176,7 @@ class Control:
             # ============  get color data from music analysis subsystem, according the play states
             if self.music_player.get_busy():
                 try:
-                    m_color = self.music_analysis.color_queue.get(block=False)
+                    m_color, color_time = self.music_analysis.color_queue.get(block=False)
                 except queue.Empty as e:
                     # FIXME: The queue should never be empty with the as the color data is preprocessed in the dynamic subsystem
                     # pure blue indicates queue empty
