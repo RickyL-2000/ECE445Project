@@ -5,6 +5,7 @@ from torch import package
 import librosa
 import numpy as np
 import math
+import time
 
 from utils.signal import *
 
@@ -27,6 +28,18 @@ class MusicAnalyzer:
         return y_[0]
 
     def gen_color_seq(self, f_path, hop_length=512, n_fft=2048, win_length=2048):
+        """
+        Timing analysis:
+            Start analyzing...
+            Init time: 7.125805854797363s
+            beats time: 1.3990507125854492s
+            energy time: 0.16361594200134277s
+            emotion time: 0.40578532218933105s
+            color map time: 0.03820037841796875s
+            enqueue time: 0.040246009826660156s
+            Analysis done.
+        The music loading takes most of the time
+        """
         print("Start analyzing...")
         self.color_queue = queue.Queue(-1)
 
