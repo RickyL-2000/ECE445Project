@@ -67,8 +67,11 @@ static void vTaskMpu6050(void *pvParameters) {
     }
     ESP_LOGI("mpu6050", "init success!");
 
-    float ax, ay, az, gx, gy, gz;
+    float ax, ay, az, gx, gy, gz, R_pitch, R_roll, G;
     float pitch, roll;
+    float pitch_sign = 1;
+    float roll_sign = 1;
+    const float sign_change_threshold = 10.0;
     float fpitch, froll;
     int count = 0;
 
@@ -88,10 +91,26 @@ static void vTaskMpu6050(void *pvParameters) {
         gx = mpu.getGyroX();
         gy = mpu.getGyroY();
         gz = mpu.getGyroZ();
-        pitch = (float) (atan(ax / az) * 57.2958); // 57.2958 = 360/2/pi
-        roll = (float) (atan(ay / az) * 57.2958);
-        fpitch = pfilter.filter(pitch, gy);
-        froll = rfilter.filter(roll, -gx);
+
+//        G = sqrtf(ax * ax + ay * ay + az * az);
+        R_pitch = sqrtf(ax * ax + az * az);
+        R_roll = sqrtf(ay * ay + az * az);
+        pitch = (float) (acosf(az / R_pitch) * 57.2958); // 57.2958 = 360/2/pi
+        roll = (float) (acosf(az / R_roll) * 57.2958);
+
+//        if (sign_change_threshold < abs(pitch) && abs(pitch) < 180 - sign_change_threshold) {
+//            fpitch = abs(pfilter.filter(pitch, gy)) * pitch_sign;
+//        } else {
+            fpitch = pfilter.filter(pitch, gy) * abs(ax) / ax;
+//        }
+//        if (sign_change_threshold < abs(roll) && abs(roll) < 180 - sign_change_threshold) {
+//            froll = abs(rfilter.filter(roll, -gx)) * roll_sign;
+//        } else {
+            froll = rfilter.filter(roll, -gx) * abs(ay) / ay;
+//        }
+
+//        pitch_sign = abs(fpitch) / fpitch;
+//        roll_sign = abs(froll) / froll;
 
         ESP_LOGD(TAG, "take mutex");
         if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
@@ -99,7 +118,7 @@ static void vTaskMpu6050(void *pvParameters) {
             ((mpuData_t *) sharedMpuData_p->data_p)->froll = froll;
             xSemaphoreGive(sharedMpuData_p->mutex);
 
-//            ESP_LOGI(TAG, "MPU angle: (%.2f, %.2f)", fpitch, froll);
+            ESP_LOGI(TAG, "MPU angle: (%.2f, %.2f)", fpitch, froll);
             ESP_LOGD(TAG, "give mutex");
 
 //            /* MPU6050 data details */
@@ -161,11 +180,11 @@ static void vTaskTcpClient(void *pvParameters) {
             ESP_LOGD(TAG, "fail to take BUTTON mutex");
         }
 
-        sprintf(msg, "(%.2f, %.2f, %d, %d, %d)", MpuData_p->fpitch, MpuData_p->froll, buttonData_p[0], buttonData_p[1],
+        sprintf(msg, "%.2f, %.2f, %d, %d, %d", MpuData_p->fpitch, MpuData_p->froll, buttonData_p[0], buttonData_p[1],
                 buttonData_p[2]);
 
         client.send(msg);
-        ESP_LOGI(TAG, "send %s", msg);
+//        ESP_LOGI(TAG, "send %s", msg);
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -251,7 +270,7 @@ extern "C" void app_main() {
     xTaskCreate(vTaskMpu6050, "vTaskMpu6050", 4096, sharedMpuData_p, 2, &mpu6050_handle);
 
     TaskHandle_t tcp_client_handle;
-    xTaskCreate(vTaskTcpClient, "vTaskTcpClient", 4096, tcpClientParameter_p, 2, &tcp_client_handle);
+    xTaskCreate(vTaskTcpClient, "vTaskTcpClient", 4096, tcpClientParameter_p, 1, &tcp_client_handle);
 
     TaskHandle_t button_handle;
     xTaskCreate(vTaskButton, "vTaskButton", 4096, sharedButtonData_p, 2, &button_handle);
