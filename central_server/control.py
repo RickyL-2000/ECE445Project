@@ -77,6 +77,7 @@ class Control:
         self.record_buffer = CircularQueue(1000)
         self._cur_command = ""
         self.cur_command_lock = Lock()
+        self.command_updated = False
 
         light_conn_ts = []
         for light_id in lights_config:
@@ -91,6 +92,7 @@ class Control:
     def cur_command(self):
         self.cur_command_lock.acquire(blocking=True)
         data = self._cur_command
+        self.command_updated = False
         self.cur_command_lock.release()
         return data
 
@@ -98,6 +100,7 @@ class Control:
     def cur_command(self, value):
         self.cur_command_lock.acquire(blocking=True)
         self._cur_command = value
+        self.command_updated = True
         self.cur_command_lock.release()
 
     def __repr__(self):
@@ -105,13 +108,6 @@ class Control:
 
     def connect_lights(self, light_id, light_config):
         self.light_connections[light_id] = Channel(light_id).becomeClient(light_config["host"], light_config["port"])
-
-    # def channel_recv(self, msg):
-    #     raise Exception(
-    #             "method deprecated, all msg received in dynamics subsystem")
-    #     record, move, color = parse.parse(
-    #             "record:{:d}, move:{:d}, color:{:d}", msg)
-    #     # TODO: zero mode
 
     def button_trigger(self, buttons):
         move, color, record = tuple([x == 1 for x in buttons])
@@ -175,14 +171,7 @@ class Control:
             # ============  get posture data from joystick
             if self.dynamics.updated:
                 d_posture, buttons = self.dynamics.joystick_data
-                print(f"recv from dynamics {d_posture}")
-
-            # if len(posture_cache) > 15:
-            #     posture_cache.pop(0)
-            # posture_cache.append(d_posture)
-            #
-            # smoothed_posture = (sum(x[0] for x in posture_cache) / len(posture_cache),
-            #                     sum(x[1] for x in posture_cache) / len(posture_cache))
+                # print(f"recv from dynamics {d_posture}")
 
             # ============  get color data from music analysis subsystem, according the play states
             if self.music_player.get_busy():
@@ -201,9 +190,7 @@ class Control:
 
             self.button_trigger(buttons)
             posture_command, color_command = self.filter(d_posture, m_color)
-            # self.command_queue.put(f"{posture_command}, {color_command}", block=False)
             self.cur_command = f"{posture_command}, {color_command}"
-            # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{posture_command}")
 
             time.sleep(PERIOD)
 
@@ -211,20 +198,23 @@ class Control:
         """Periodly send the command from the command queue to the light tcp server"""
         command = ""
         while True:
-            command = self.cur_command
-            # try:
-            #     # command = self.command_queue.get(block=True)
-            #     # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{command}")
-            #     # self.cur_command = command
-            # except queue.Empty as e:
-            #     # FIXME: The queue should never be empty, as mentioned in recv and the maintainance of control subsystem
-            #     #       here just do nothing to variable `command` to send the same command when crash
-            #     pass
-            for id in self.light_connections:
-                send_t = Thread(target=self.light_connections[id].send, args=(
-                        command,), daemon=True)
-                send_t.start()
-            time.sleep(PERIOD)
+            if self.command_updated:
+                command = self.cur_command
+                # try:
+                #     # command = self.command_queue.get(block=True)
+                #     # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{command}")
+                #     # self.cur_command = command
+                # except queue.Empty as e:
+                #     # FIXME: The queue should never be empty, as mentioned in recv and the maintainance of control subsystem
+                #     #       here just do nothing to variable `command` to send the same command when crash
+                #     pass
+                # for id in self.light_connections:
+                #     send_t = Thread(target=self.light_connections[id].send, args=(
+                #             command,), daemon=True)
+                #     send_t.start()
+                self.light_connections["lightB"].send(command)
+                # print("send" + command.split(", ")[0])
+                # time.sleep(PERIOD / 2)
 
     def monitor(self):
         while True:
