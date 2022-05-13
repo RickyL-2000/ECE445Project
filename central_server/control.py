@@ -2,22 +2,14 @@ import queue
 import random
 import time
 import pygame
-from threading import Thread
+from threading import Thread, Lock
 
 from transitions import Machine
 
 from utils.channel import Channel
+from utils.circular_queue import CircularQueue
 
-PERIOD = 0.01 #s
-
-class CircularQueue(queue.Queue):
-    def __init__(self, maxsize):
-        super().__init__(maxsize)
-
-    def put(self, *arg, **kwarg):
-        if self.full():
-            self.get(block=False)
-        super().put(*arg, kwarg)
+PERIOD = 0.01  # s
 
 
 class Gimbal:
@@ -83,7 +75,8 @@ class Control:
         self.command_queue = queue.Queue(1000)
         self.light_connections = {}
         self.record_buffer = CircularQueue(1000)
-        self.cur_command = ""
+        self._cur_command = ""
+        self.cur_command_lock = Lock()
 
         light_conn_ts = []
         for light_id in lights_config:
@@ -93,6 +86,19 @@ class Control:
             t.start()
         for t in light_conn_ts:
             t.join()
+
+    @property
+    def cur_command(self):
+        self.cur_command_lock.acquire(blocking=True)
+        data = self._cur_command
+        self.cur_command_lock.release()
+        return data
+
+    @cur_command.setter
+    def cur_command(self, value):
+        self.cur_command_lock.acquire(blocking=True)
+        self._cur_command = value
+        self.cur_command_lock.release()
 
     def __repr__(self):
         return f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{self.cur_command}"
@@ -164,14 +170,19 @@ class Control:
                 format: "(theta, phi), (R, G, B)"
         """
         d_posture, buttons = (0.0, 0.0), (0, 0, 0)
+        posture_cache = [(0, 0)]
         while True:
             # ============  get posture data from joystick
-            try:
-                d_posture, buttons = self.dynamics.joystick_queue.get(block=False)
-            except queue.Empty as e:
-                # FIXME: The queue should never be empty with the temporal remap in the dynamic subsystem
-                # give the same value if no new data is received.
-                pass
+            if self.dynamics.updated:
+                d_posture, buttons = self.dynamics.joystick_data
+                print(f"recv from dynamics {d_posture}")
+
+            # if len(posture_cache) > 15:
+            #     posture_cache.pop(0)
+            # posture_cache.append(d_posture)
+            #
+            # smoothed_posture = (sum(x[0] for x in posture_cache) / len(posture_cache),
+            #                     sum(x[1] for x in posture_cache) / len(posture_cache))
 
             # ============  get color data from music analysis subsystem, according the play states
             if self.music_player.get_busy():
@@ -188,10 +199,10 @@ class Control:
                 # pure green indicates no music is playing
                 m_color = (0, 255, 0)
 
-
             self.button_trigger(buttons)
             posture_command, color_command = self.filter(d_posture, m_color)
-            self.command_queue.put(f"{posture_command}, {color_command}", block=False)
+            # self.command_queue.put(f"{posture_command}, {color_command}", block=False)
+            self.cur_command = f"{posture_command}, {color_command}"
             # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{posture_command}")
 
             time.sleep(PERIOD)
@@ -200,19 +211,20 @@ class Control:
         """Periodly send the command from the command queue to the light tcp server"""
         command = ""
         while True:
-            try:
-                command = self.command_queue.get(block=True)
-                # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{command}")
-                # self.cur_command = command
-            except queue.Empty as e:
-                # FIXME: The queue should never be empty, as mentioned in recv and the maintainance of control subsystem
-                #       here just do nothing to variable `command` to send the same command when crash
-                pass
+            command = self.cur_command
+            # try:
+            #     # command = self.command_queue.get(block=True)
+            #     # print(f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{self.record_buffer.qsize()} command:{command}")
+            #     # self.cur_command = command
+            # except queue.Empty as e:
+            #     # FIXME: The queue should never be empty, as mentioned in recv and the maintainance of control subsystem
+            #     #       here just do nothing to variable `command` to send the same command when crash
+            #     pass
             for id in self.light_connections:
                 send_t = Thread(target=self.light_connections[id].send, args=(
                         command,), daemon=True)
                 send_t.start()
-            # time.sleep(PERIOD)
+            time.sleep(PERIOD)
 
     def monitor(self):
         while True:
@@ -223,7 +235,7 @@ class Control:
         # self.music_player.play()
         recv_t = Thread(target=self.recv, daemon=True)
         send_t = Thread(target=self.send, daemon=True)
-        # monitor_t = Thread(target=self.monitor, daemon=True)
+        monitor_t = Thread(target=self.monitor, daemon=True)
 
         recv_t.start()
         send_t.start()
