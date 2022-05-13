@@ -34,7 +34,7 @@ private:
     mcpwm_timer_t servo_mcpwm_timer;
     mcpwm_generator_t servo_mcpwm_generator;
 
-    uint32_t angle2dutyus(int angle) const;
+    uint32_t angle2dutyus(float angle) const;
 
 public:
     int servo_angle = 0;
@@ -43,7 +43,7 @@ public:
           mcpwm_unit_t mcpwm_unit, mcpwm_io_signals_t mcpwm_io_signal,
           mcpwm_timer_t mcpwm_timer, mcpwm_generator_t mcpwm_generator);
 
-    esp_err_t set_angle(int angle);
+    esp_err_t set_angle(float angle);
 };
 
 #endif //_SERVO_HPP
