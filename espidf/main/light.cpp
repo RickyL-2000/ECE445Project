@@ -48,9 +48,6 @@ typedef struct tcpServerTaskParameters_t {
 //} sharedData_t;
 
 
-const TickType_t xPeriodTicks = 1000 / portTICK_PERIOD_MS;
-
-
 void tcp_server_task(void *pvParameters) {
     static char TAG[] = "tcp_server_task";
 
@@ -117,7 +114,7 @@ void tcp_server_task(void *pvParameters) {
                     ESP_LOGW(TAG, "Connection closed");
                 } else {
                     output_buffer[slen] = 0; // Null-terminate whatever is received and treat it like a string
-                    ESP_LOGI(TAG, "Received %d bytes: %s", recv_len, output_buffer);
+                    ESP_LOGD(TAG, "Received %d bytes: %s", recv_len, output_buffer);
                 }
                 sscanf(output_buffer, "(%f, %f), (%u, %u, %u)", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
                        &(ledCommend.B));
@@ -143,13 +140,15 @@ void dummy_control_task(void *pvParameters) {
     float pitch, roll;
     ledCommend_t ledCommend;
 
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
         xQueuePeek(commandQueues->yawQueue, &roll, 0);
         xQueuePeek(commandQueues->pitchQueue, &pitch, 0);
         xQueuePeek(commandQueues->ledQueue, &ledCommend, 0);
-        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %u,%u,%u", pitch, roll, ledCommend.R, ledCommend.G, ledCommend.B);
+        ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %u,%u,%u", pitch, roll, ledCommend.R, ledCommend.G,
+                 ledCommend.B);
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -163,21 +162,23 @@ void led_control_task(void *pvParameters) {
 
     led_strip_t *strip = led_strip_init(RMT_TX_CHANNEL, RMT_TX_GPIO, LED_NUMBER);
 
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        xQueueReceive(commandQueues->ledQueue, &ledCommend, 0);
-        ESP_LOGI(TAG, "receive from led queue:  %u,%u,%u", ledCommend.R, ledCommend.G, ledCommend.B);
-        for (int j = 0; j < LED_NUMBER; j++) {
-            ESP_ERROR_CHECK(strip->set_pixel(strip, j, ledCommend.R, ledCommend.G, ledCommend.B));
+        if (xQueueReceive(commandQueues->ledQueue, &ledCommend, 0) == pdTRUE) {
+            ESP_LOGD(TAG, "receive from led queue:  %u,%u,%u", ledCommend.R, ledCommend.G, ledCommend.B);
+            for (int j = 0; j < LED_NUMBER; j++) {
+                ESP_ERROR_CHECK(strip->set_pixel(strip, j, ledCommend.R, ledCommend.G, ledCommend.B));
+            }
+            // Flush RGB values to LEDs
+            ESP_ERROR_CHECK(strip->refresh(strip, 100));
+            vTaskDelay(pdMS_TO_TICKS(10));
+            // FIXME: the timing of clear needs to be decided,
+            //  otherwise the light will not be turned off even if the task is done
+            // strip->clear(strip, 50);
+            // vTaskDelay(pdMS_TO_TICKS(10));
         }
-        // Flush RGB values to LEDs
-        ESP_ERROR_CHECK(strip->refresh(strip, 100));
-        vTaskDelay(pdMS_TO_TICKS(10));
-        // FIXME: the timing of clear needs to be decided,
-        //  otherwise the light will not be turned off even if the task is done
-        // strip->clear(strip, 50);
-        // vTaskDelay(pdMS_TO_TICKS(10));
 
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
@@ -189,16 +190,41 @@ void servo_pitch_task(void *pvParameters) {
     auto *commandQueues = (commandQueues_t *) pvParameters;
 
     float pitch;
+    float sum_pitch = 0.0;
+//    const float lambda = 0.2;
+    const int k_size = 10;
+    int index = 0;
+    float pitch_lst[k_size] = {0};
 
-    Servo servo_pitch(DS3218, SERVO_PITCH_GPIO,
-                      MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
+    Servo servo_pitch(DS3218, SERVO_YAW_GPIO,
+                      MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
 
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        xQueueReceive(commandQueues->pitchQueue, &pitch, 0);
-        ESP_ERROR_CHECK(servo_pitch.set_angle((int)pitch));
+        if (xQueueReceive(commandQueues->pitchQueue, &pitch, 0) == pdTRUE) {
 
+            sum_pitch += pitch - pitch_lst[index];
+            pitch_lst[index] = pitch;
+//            sum_pitch = lambda * pitch + (1 - lambda) * sum_pitch;
+//            sum_pitch = ;
+//            for (int idx = 0; idx < k_size; idx++) {
+//                sum_pitch += pitch_lst[idx];
+//            }
+//            sum_pitch /= k_size;
+            index = (index + 1) % k_size;
+            ESP_ERROR_CHECK(servo_pitch.set_angle(sum_pitch / k_size));
+            ESP_LOGI(TAG, "%.2f ", sum_pitch / k_size);
+//            ESP_LOGI(TAG,
+//                     "%.2f | %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+//                     sum_pitch / k_size,
+//                     pitch_lst[0], pitch_lst[1], pitch_lst[2], pitch_lst[3], pitch_lst[4], pitch_lst[5], pitch_lst[6],
+//                     pitch_lst[7], pitch_lst[8], pitch_lst[9],
+//                     pitch_lst[10], pitch_lst[11], pitch_lst[12], pitch_lst[13], pitch_lst[14], pitch_lst[15],
+//                     pitch_lst[16], pitch_lst[17], pitch_lst[18], pitch_lst[19]
+//            );
+        }
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -209,15 +235,32 @@ void servo_yaw_task(void *pvParameters) {
     auto *commandQueues = (commandQueues_t *) pvParameters;
 
     float yaw;
+    float sum_yaw = 0.0;
+//    const float lambda = 0.2;
+    const int k_size = 20;
+    int index = 0;
+    float yaw_lst[k_size] = {0};
 
     Servo servo_yaw(DS3218, SERVO_YAW_GPIO,
                     MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
 
+    const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        xQueueReceive(commandQueues->yawQueue, &yaw, 0);
-        ESP_ERROR_CHECK(servo_yaw.set_angle((int)yaw));
+        if (xQueueReceive(commandQueues->yawQueue, &yaw, 0) == pdTRUE) {
+
+            sum_yaw += yaw - yaw_lst[index];
+            yaw_lst[index] = yaw;
+//            sum_yaw = lambda * yaw + (1 - lambda) * sum_yaw;
+//            sum_yaw = ;
+//            for (int idx = 0; idx < k_size; idx++) {
+//                sum_yaw += yaw_lst[idx];
+//            }
+//            sum_yaw /= k_size;
+            index = (index + 1) % k_size;
+            ESP_ERROR_CHECK(servo_yaw.set_angle(sum_yaw / k_size));
+        }
 
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
@@ -235,11 +278,11 @@ extern "C" void app_main() {
     }
     ESP_ERROR_CHECK(ret);
 
-   // // test dummy led
-   // auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
-   // TaskHandle_t dummy_led_handle;
-   // xTaskCreate(dummy_led_task, "dummy_led", 4096,
-   //             commandQueues_p, 5, &dummy_led_handle);
+    // // test dummy led
+    // auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
+    // TaskHandle_t dummy_led_handle;
+    // xTaskCreate(dummy_led_task, "dummy_led", 4096,
+    //             commandQueues_p, 5, &dummy_led_handle);
 
     // test dummy servo
     // auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
@@ -251,11 +294,11 @@ extern "C" void app_main() {
     // Initialize wifi and connect
     wifi_init_sta();
 
-   //  used for sharing data, but queue always copy, so un-used
-   // auto *mpuData = (struct mpuData_t *) malloc(sizeof(struct mpuData_t));
-   // auto *sharedMpuData = (sharedData_t *) malloc(sizeof(sharedData_t));
-   // sharedMpuData->mutex = xSemaphoreCreateMutex();
-   // sharedMpuData->data_p = (void *const) mpuData;
+    //  used for sharing data, but queue always copy, so un-used
+    // auto *mpuData = (struct mpuData_t *) malloc(sizeof(struct mpuData_t));
+    // auto *sharedMpuData = (sharedData_t *) malloc(sizeof(sharedData_t));
+    // sharedMpuData->mutex = xSemaphoreCreateMutex();
+    // sharedMpuData->data_p = (void *const) mpuData;
 
 
     // from tcp server to the command queue
@@ -280,18 +323,18 @@ extern "C" void app_main() {
 
     TaskHandle_t led_control_handle;
     xTaskCreate(led_control_task, "led_control", 4096,
-                tcpServerTaskParameters, 5, &led_control_handle);
+                commandQueues_p, 5, &led_control_handle);
 
     TaskHandle_t servo_pitch_handle;
     xTaskCreate(servo_pitch_task, "servo_pitch", 4096,
                 commandQueues_p, 5, &servo_pitch_handle);
 
-    TaskHandle_t servo_yaw_handle;
-    xTaskCreate(servo_yaw_task, "servo_yaw", 4096,
-                commandQueues_p, 5, &servo_yaw_handle);
+//    TaskHandle_t servo_yaw_handle;
+//    xTaskCreate(servo_yaw_task, "servo_yaw", 4096,
+//                commandQueues_p, 5, &servo_yaw_handle);
 
-    // TaskHandle_t dummy_control_handle;
-    // xTaskCreate(dummy_control_task, "dummy_control", 4096,
-    //             commandQueues_p, 5, &dummy_control_handle);
+//    TaskHandle_t dummy_control_handle;
+//    xTaskCreate(dummy_control_task, "dummy_control", 4096,
+//                commandQueues_p, 5, &dummy_control_handle);
 
 }
