@@ -10,23 +10,23 @@
 // You can get these value from the datasheet of servo you use, in general pulse width varies between 1000 to 2000 mocrosecond
 #define SERVO_MIN_PULSEWIDTH_US (500) // Minimum pulse width in microsecond
 #define SERVO_MAX_PULSEWIDTH_US (2500) // Maximum pulse width in microsecond
-#define SERVO_MAX_DEGREE_DS3230 (180)   // Maximum angle in degree of DS3230 (360 / 2 = 180)
-#define SERVO_MAX_DEGREE_DS3218 (135)   // Maximum angle in degree of DS3218 (270 / 2 = 135)
+#define SERVO_MAX_DEGREE_D360 (180)   // Maximum angle in degree of D360 (360 / 2 = 180)
+#define SERVO_MAX_DEGREE_D270 (135)   // Maximum angle in degree of D270 (270 / 2 = 135)
 
 // 3230 (360舵机)
 // failed
 // CCW: 10圈用了16.73秒，即每秒215.18度，
 // CW: 10圈用了18.58秒，即每秒193.75
 
-#define DS3230 3230
-#define DS3218 3218
+#define D360 360
+#define D270 270
 
 
 class Servo {
 
 private:
     static constexpr const char *TAG = "servo";
-    int servo_name;    // DS3230, or DS3218
+    int servo_name;    // D360, or D270
     int servo_max_degree;
     gpio_num_t servo_pulse_gpio;
     mcpwm_unit_t servo_mcpwm_unit;

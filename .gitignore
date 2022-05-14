@@ -14,3 +14,6 @@ emotifymusic
 music_analyzer/mood_recog/checkpoints/checkpoint_*/*.pkl
 music_analyzer/mood_recog/checkpoints/checkpoint_*/*.pt
 music_analyzer/mood_recog/model.pt
+
+# music
+central_server/music

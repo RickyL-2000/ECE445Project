@@ -197,7 +197,7 @@ void servo_pitch_task(void *pvParameters) {
     int index = 0;
     float pitch_lst[k_size] = {0};
 
-    Servo servo_pitch(DS3218, SERVO_PITCH_GPIO,
+    Servo servo_pitch(D270, SERVO_PITCH_GPIO,
                       MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
@@ -225,8 +225,8 @@ void servo_yaw_task(void *pvParameters) {
     int index = 0;
     float yaw_lst[k_size] = {0};
 
-    Servo servo_yaw(DS3218, SERVO_YAW_GPIO,
-                    MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
+    Servo servo_yaw(D360, SERVO_YAW_GPIO,
+                    MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;

@@ -3,10 +3,10 @@
 Servo::Servo(int servo_type, gpio_num_t gpio_num,
              mcpwm_unit_t mcpwm_unit, mcpwm_io_signals_t mcpwm_io_signal,
              mcpwm_timer_t mcpwm_timer, mcpwm_generator_t mcpwm_generator) {
-    if (servo_type == DS3230) {
-        servo_max_degree = SERVO_MAX_DEGREE_DS3230;
-    } else if (servo_type == DS3218) {
-        servo_max_degree = SERVO_MAX_DEGREE_DS3218;
+    if (servo_type == D360) {
+        servo_max_degree = SERVO_MAX_DEGREE_D360;
+    } else if (servo_type == D270) {
+        servo_max_degree = SERVO_MAX_DEGREE_D270;
     }
     servo_name = servo_type;
     servo_pulse_gpio = gpio_num;
@@ -33,12 +33,12 @@ uint32_t Servo::angle2dutyus(float angle) const {
 }
 
 esp_err_t Servo::set_angle(float angle) {
-    if (servo_name == DS3218) {
-        ESP_ERROR_CHECK(
-                mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer, servo_mcpwm_generator, angle2dutyus(angle))
-        );
-        return ESP_OK;
-//    } else if (servo_name == DS3230) {
+    // if (servo_name == D270) {
+    ESP_ERROR_CHECK(
+            mcpwm_set_duty_in_us(servo_mcpwm_unit, servo_mcpwm_timer, servo_mcpwm_generator, angle2dutyus(angle))
+    );
+    return ESP_OK;
+//    } else if (servo_name == D360) {
 //           float ccw_speed = 215.18;
 //           float cw_speed = 193.75;
 //           float offset;
@@ -65,6 +65,6 @@ esp_err_t Servo::set_angle(float angle) {
 //           }
 //           servo_angle = angle;
 //           return ESP_OK;
-    }
-    return ESP_OK;
+//     }
+//     return ESP_OK;
 }
