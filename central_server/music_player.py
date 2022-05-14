@@ -1,4 +1,5 @@
 import glob
+import os
 
 from mutagen.mp3 import MP3
 import pygame
@@ -23,9 +24,10 @@ import pygame
 class MusicPlayer:
     def __init__(self, music_dir):
         pygame.mixer.init()
+        self.music_dir = music_dir
         self.music_files = glob.glob(f'{music_dir}/*.mp3')
         self.cur_music_idx = 0
-        self.cur_music_pos = 0.0
+        self.cur_music_pos = 0.0    # in sec
         pygame.mixer.music.load(self.music_files[self.cur_music_idx])
         for i in self.music_files:
             pygame.mixer.music.queue(i)
@@ -53,15 +55,18 @@ class MusicPlayer:
 
         self.components = {
             "root_window": pygame.Rect(0, 0, 800, 600),
-            "play_bt": Button(self.surfaces["play_bt"], name="play_bt", size=(80, 80), pos=(430, 420)),
-            "next_bt": Button(self.surfaces["next_bt"], name="next_bt", size=(80, 80), pos=(570, 420)),
-            "stop_bt": Button(self.surfaces["stop_bt"], name="stop_bt", size=(80, 80), pos=(290, 420)),
-            "prev_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(150, 420)),
-            "p_bar": ProgressBar(self.surfaces["circle"], name="p_bar", size=(30, 30), pos=(100, 420), length=600,
-                                 src=(100, 400), dst=(700, 400), height=2, line_color=(0, 100, 100))
+            "play_bt": Button(self.surfaces["play_bt"], name="play_bt", size=(80, 80), pos=(430, 460)),
+            "next_bt": Button(self.surfaces["next_bt"], name="next_bt", size=(80, 80), pos=(570, 460)),
+            "stop_bt": Button(self.surfaces["stop_bt"], name="stop_bt", size=(80, 80), pos=(290, 460)),
+            "prev_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(150, 460)),
+            "p_bar": ProgressBar(self.surfaces["circle"], name="p_bar", size=(30, 30), pos=(100, 430), length=600,
+                                 src=(100, 430), dst=(700, 430), height=2, line_color=(0, 100, 100)),
+            "text_lst": TextList(None, name="text_lst", size=(500, 250), pos=(150, 90), num=5, spacing=10,
+                                 margin=(5, 5, 5, 5), font=None, font_size=35, color=(58, 75, 91), bg_color=None)
         }
 
         self.screen = None
+        self.cursor = 0
 
         self.running = False
 
@@ -99,10 +104,18 @@ class MusicPlayer:
     def next_music(self):
         self.cur_music_idx = (self.cur_music_idx + 1) % len(self.music_files)
         self.play()
+        if self.cur_music_idx >= self.cursor + len(self.components["text_lst"]):
+            self.cursor = self.cur_music_idx - len(self.components["text_lst"]) + 1
+        if self.cur_music_idx == 0:
+            self.cursor = 0
 
     def prev_music(self):
         self.cur_music_idx = (self.cur_music_idx - 1) % len(self.music_files)
         self.play()
+        if self.cur_music_idx < self.cursor:
+            self.cursor = self.cur_music_idx
+        if self.cur_music_idx == len(self.music_files) - 1:
+            self.cursor = len(self.music_files) - len(self.components["text_lst"])
 
     def set_volume(self, vol):
         self.volume = vol
@@ -112,6 +125,25 @@ class MusicPlayer:
         self.cur_music_info = {
             "length": MP3(self.music_files[self.cur_music_idx]).info.length  # in sec
         }
+
+    def _update_music_files(self):
+        cur_music = self.music_files[self.cur_music_idx]
+        self.music_files = glob.glob(f'{self.music_dir}/*.mp3')
+        if len(self.music_files) > 0:
+            cur_music_idx = self.music_files.index(cur_music)
+            if cur_music_idx == -1:
+                self.stop()
+                self.cur_music_idx = 0
+                self.cur_music_pos = 0.0  # in sec
+                pygame.mixer.music.load(self.music_files[self.cur_music_idx])
+            elif cur_music_idx >= 0:
+                self.cur_music_idx = cur_music_idx
+            for i in self.music_files:
+                pygame.mixer.music.queue(i)
+        else:
+            self.stop()
+            self.cur_music_idx = 0
+            self.cur_music_pos = 0.0  # in sec
 
     def run(self):
         pygame.init()
@@ -126,11 +158,30 @@ class MusicPlayer:
         self.running = True
         while self.running:
 
+            self._update_music_files()
+            for i in range(len(self.components["text_lst"])):
+                if i + self.cursor < len(self.music_files):
+                    self.components["text_lst"][i]\
+                        .set_text(self.screen,
+                                  f"{i + self.cursor:02}   " + os.path.basename(self.music_files[i + self.cursor]))
+                else:
+                    self.components["text_lst"][i].set_text(self.screen, "")
+                if i + self.cursor == self.cur_music_idx:
+                    self.components["text_lst"][i].set_color(self.screen, color=(0, 0, 0), bg_color=None)
+                else:
+                    self.components["text_lst"][i].set_color(self.screen, color=(58, 75, 91), bg_color=None)
+
             self.screen.blit(self.surfaces["background"], (0, 0))
             self.components["play_bt"].display(self.screen)
             self.components["next_bt"].display(self.screen)
             self.components["prev_bt"].display(self.screen)
             self.components["stop_bt"].display(self.screen)
+            self.components["text_lst"].display(self.screen)
+
+            if self.get_busy():
+                self.components["play_bt"].set_surface(self.surfaces["pause_bt"])
+            else:
+                self.components["play_bt"].set_surface(self.surfaces["play_bt"])
 
             self.cur_music_pos = pygame.mixer.music.get_pos() / 1000
             # print(self.cur_music_pos)
@@ -165,27 +216,32 @@ class MusicPlayer:
                         self.set_volume(self.volume)
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_x, mouse_y = pygame.mouse.get_pos()
-                    if self.components["play_bt"].check_hover(mouse_x, mouse_y):
+                    if self.components["play_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:  # 1: left click
                         if self.status == "play":
-                            self.components["play_bt"].set_surface(self.surfaces["play_bt"])
                             self.pause()
                         elif self.status == "pause":
-                            self.components["play_bt"].set_surface(self.surfaces["pause_bt"])
                             self.unpause()
                         elif self.status == "stop":
-                            self.components["play_bt"].set_surface(self.surfaces["pause_bt"])
                             self.rewind()
-                    elif self.components["next_bt"].check_hover(mouse_x, mouse_y):
+                    elif self.components["next_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
                         self.next_music()
-                    elif self.components["prev_bt"].check_hover(mouse_x, mouse_y):
+                    elif self.components["prev_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
                         self.prev_music()
-                    elif self.components["stop_bt"].check_hover(mouse_x, mouse_y):
+                    elif self.components["stop_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
                         self.components["play_bt"].set_surface(self.surfaces["play_bt"])
                         self.stop()
+                    # wheel
+                    elif self.components["text_lst"].check_hover(mouse_x, mouse_y):
+                        if event.button == 4:   # slid up
+                            self.cursor = self.cursor - 1 if self.cursor > 0 else 0
+                        elif event.button == 5:   # slid down
+                            self.cursor = self.cursor + 1 \
+                                if self.cursor < len(self.music_files)-1 else len(self.music_files) - 1
 
             pygame.display.update()
 
-class Control:
+
+class BaseControl:
     def __init__(self, surface, name=None, size=(0, 0), pos=(0, 0)):
         self.screen = None
         self.surface = surface
@@ -194,8 +250,11 @@ class Control:
         self.pos = pos
 
         # self.instance = pygame.image.load(img_path)
-        self.surface = pygame.transform.scale(self.surface, self.size)
-        self.rect = self.surface.get_rect()
+        if surface is not None:
+            self.surface = pygame.transform.scale(self.surface, self.size)
+            self.rect = self.surface.get_rect()
+        else:
+            self.rect = pygame.Rect((pos[0], pos[1], size[1], size[0]))
 
     def check_hover(self, mouse_x, mouse_y):
         return self.pos[0] < mouse_x < self.rect.width + self.pos[0] \
@@ -215,12 +274,12 @@ class Control:
             self.display(self.screen)
 
 
-class Button(Control):
+class Button(BaseControl):
     def __init__(self, surface, name=None, size=(0, 0), pos=(0, 0)):
         super(Button, self).__init__(surface, name, size, pos)
 
 
-class ProgressBar(Control):
+class ProgressBar(BaseControl):
     # only support horizontal progress bar
     def __init__(self, surface, name=None, size=(0, 0), pos=(0, 0), length=600, src=(100, 400), dst=(700, 400), height=2, line_color=(0, 100, 100)):
         super(ProgressBar, self).__init__(surface, name, size, pos)
@@ -242,6 +301,68 @@ class ProgressBar(Control):
             self.pos = pos
         pygame.draw.line(screen, self.line_color, self.src, self.dst, self.height)
         self.screen.blit(self.surface, self.pos)
+
+class TextBox(BaseControl):
+    def __init__(self, surface, name=None, size=(0, 0), pos=(0, 0), text="", font=None, font_size=20,
+                 color=(0, 0, 0), bg_color=None):
+        super(TextBox, self).__init__(surface, name, size, pos)
+        self.text = text
+        self.font = font
+        self.font_size = font_size
+        self.color = color
+        self.bg_color = bg_color
+
+    def set_text(self, screen, text):
+        self.text = text
+        self.display(screen)
+
+    def set_color(self, screen, color, bg_color=None):
+        self.color = color
+        self.bg_color = bg_color
+        self.display(screen)
+
+    def display(self, screen, pos=None):
+        self.screen = screen
+        if pos is not None:
+            self.pos = pos
+        if self.font is None:
+            self.font = pygame.font.Font(None, self.font_size)
+        self.surface = self.font.render(self.text, True, self.color, self.bg_color)
+        self.screen.blit(self.surface, self.pos)
+
+class TextList(BaseControl):
+    # only support vertical list
+    def __init__(self, surface, name=None, size=(0, 0), pos=(0, 0), num=5, spacing=30, margin=(5, 5, 5, 5),
+                 font=None, font_size=20, color=(0, 0, 0), bg_color=None):
+        super(TextList, self).__init__(surface, name, size, pos)
+        self.text_list = []
+        self.num = num
+        self.spacing = spacing
+        self.margin = margin    # top, down, left, right
+        self.font = font
+        self.font_size = font_size
+        self.color = color
+        self.bg_color = bg_color
+
+        for i in range(num):
+            textbox_size = (size[0], (size[1]-margin[0]-margin[1]+spacing)/num)
+            textbox_pos = (pos[0]+margin[2], pos[1]+margin[0]+i*(textbox_size[1]+spacing))
+            textbox = TextBox(surface=None, name="textbox", size=textbox_size, pos=textbox_pos, text="",
+                              font=font, font_size=font_size, color=color, bg_color=bg_color)
+            self.text_list.append(textbox)
+
+    def __getitem__(self, idx):
+        return self.text_list[idx]
+
+    def __len__(self):
+        return self.num
+
+    def display(self, screen, pos=None):
+        self.screen = screen
+        if pos is not None:
+            self.pos = pos
+        for i in range(self.num):
+            self.text_list[i].display(screen)
 
 if __name__ == "__main__":
     music_player = MusicPlayer(r"D:\ECE445Project\central_server\music")
