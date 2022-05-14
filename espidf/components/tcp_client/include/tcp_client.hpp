@@ -18,8 +18,10 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 
-// #define HOST_IP_ADDR "192.168.31.177"
-#define HOST_IP_ADDR "192.168.43.136"
+
+//#define HOST_IP_ADDR "192.168.31.245" // COM10 light
+ #define HOST_IP_ADDR "192.168.31.177" // HAOZHE-XIAOXIN central server
+//#define HOST_IP_ADDR "192.168.43.136"
 
 #define PORT 8880
 
