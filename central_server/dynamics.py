@@ -29,6 +29,10 @@ class Dynamics:
         self.joystick_lock = Lock()
         self._joystick_data = ((0, 0), (0, 0, 0))
         self.updated = False
+        self.last_buffer_len = 20
+        self.last_theta = [0] * self.last_buffer_len
+        self.last_phi = [0] * self.last_buffer_len
+        self.count = 1
 
     @property
     def joystick_data(self):
@@ -47,12 +51,12 @@ class Dynamics:
 
     def recv(self, msg):
         theta, phi, move, color, record = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}", msg)
-        # print(theta, phi)
-        # theta, phi = parse.parse("fptich:{:f}, froll:{:f}", msg)
+
         theta, phi = Dynamics.spatial_remap(theta, phi)
-        # theta, phi = self.temporal_remap(theta, phi)
+        theta, phi = self.temporal_remap(theta, phi)
+
         data = ((theta, phi), (move, color, record))  # (posture,buttons)
-        # self.joystick_queue.put(data)
+
         self.joystick_data = data
 
     @classmethod
@@ -66,8 +70,14 @@ class Dynamics:
         return theta, phi
 
     def temporal_remap(self, theta, phi):
-        # TODO: Interpolation
-        return theta, phi
+        # when shake severely, the value will be it's opposite for a few sample data, we need to handle it here
+        self.last_theta[self.count] = theta
+        self.last_phi[self.count] = phi
+        sign_theta = 1 if sum(self.last_theta) > 0 else -1
+        sign_phi = 1 if sum(self.last_phi) > 0 else -1
+        self.count = (self.count + 1) % self.last_buffer_len
+
+        return sign_theta * abs(theta), sign_phi * abs(phi)
 
 
 if __name__ == "__main__":

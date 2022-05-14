@@ -9,7 +9,7 @@ from transitions import Machine
 from utils.channel import Channel
 from utils.circular_queue import CircularQueue
 
-PERIOD = 0.01  # s
+PERIOD = 0.009  # s
 
 
 class Gimbal:
@@ -39,7 +39,7 @@ class Color:
 
     def __init__(self) -> None:
         self.machine = Machine(
-                model=self, states=Color.states, transitions=Color.transitions, initial='random',
+                model=self, states=Color.states, transitions=Color.transitions, initial='music',
                 ignore_invalid_triggers=True)
 
 
@@ -190,7 +190,9 @@ class Control:
 
             self.button_trigger(buttons)
             posture_command, color_command = self.filter(d_posture, m_color)
-            self.cur_command = f"{posture_command}, {color_command}"
+            # color_command = []
+            self.cur_command = f"{posture_command[0]:.2f}, {posture_command[1]:.2f}, {color_command[0]}, {color_command[1]}, {color_command[2]}"
+            # self.cur_command = f"{', '.join([f'{x:.2f}' for x in posture_command])}, {', '.join([f'{x}' for x in color_command])}"
 
             time.sleep(PERIOD)
 
@@ -213,7 +215,7 @@ class Control:
                 #             command,), daemon=True)
                 #     send_t.start()
                 self.light_connections["lightB"].send(command)
-                # print("send" + command.split(", ")[0])
+                # print("send" + command)
                 # time.sleep(PERIOD / 2)
 
     def monitor(self):
