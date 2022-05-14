@@ -28,11 +28,11 @@
 #include <lwip/netdb.h>
 
 #define PORT                        12345
-#define KEEPALIVE_IDLE              5
-#define KEEPALIVE_INTERVAL          3
-#define KEEPALIVE_COUNT             3
+#define KEEPALIVE_IDLE              1
+#define KEEPALIVE_INTERVAL          1
+#define KEEPALIVE_COUNT             1
 
-#define BUFFER_SIZE     128
+#define BUFFER_SIZE     1024
 
 #ifdef __cplusplus
 extern "C" {

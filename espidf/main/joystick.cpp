@@ -67,11 +67,8 @@ static void vTaskMpu6050(void *pvParameters) {
     }
     ESP_LOGI("mpu6050", "init success!");
 
-    float ax, ay, az, gx, gy, gz, R_pitch, R_roll, G;
+    float ax, ay, az, gx, gy, gz, R_pitch, R_roll;
     float pitch, roll;
-    float pitch_sign = 1;
-    float roll_sign = 1;
-    const float sign_change_threshold = 10.0;
     float fpitch, froll;
     int count = 0;
 
@@ -98,28 +95,20 @@ static void vTaskMpu6050(void *pvParameters) {
         pitch = (float) (acosf(az / R_pitch) * 57.2958); // 57.2958 = 360/2/pi
         roll = (float) (acosf(az / R_roll) * 57.2958);
 
-//        if (sign_change_threshold < abs(pitch) && abs(pitch) < 180 - sign_change_threshold) {
-//            fpitch = abs(pfilter.filter(pitch, gy)) * pitch_sign;
-//        } else {
-            fpitch = pfilter.filter(pitch, gy) * abs(ax) / ax;
-//        }
-//        if (sign_change_threshold < abs(roll) && abs(roll) < 180 - sign_change_threshold) {
-//            froll = abs(rfilter.filter(roll, -gx)) * roll_sign;
-//        } else {
-            froll = rfilter.filter(roll, -gx) * abs(ay) / ay;
-//        }
+        fpitch = pfilter.filter(pitch, gy) * abs(ax) / ax;
+        froll = rfilter.filter(roll, -gx) * abs(ay) / ay;
 
-//        pitch_sign = abs(fpitch) / fpitch;
-//        roll_sign = abs(froll) / froll;
+//        fpitch = (float)count-180;
+//        froll = (float)count-180;
+//        count = (count+1)%360;
+//        ESP_LOGD(TAG, "take mutex");
+//        if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
+        ((mpuData_t *) sharedMpuData_p->data_p)->fpitch = fpitch;
+        ((mpuData_t *) sharedMpuData_p->data_p)->froll = froll;
+//            xSemaphoreGive(sharedMpuData_p->mutex);
 
-        ESP_LOGD(TAG, "take mutex");
-        if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
-            ((mpuData_t *) sharedMpuData_p->data_p)->fpitch = fpitch;
-            ((mpuData_t *) sharedMpuData_p->data_p)->froll = froll;
-            xSemaphoreGive(sharedMpuData_p->mutex);
-
-            ESP_LOGI(TAG, "MPU angle: (%.2f, %.2f)", fpitch, froll);
-            ESP_LOGD(TAG, "give mutex");
+//            ESP_LOGI(TAG, "MPU angle: (%.2f, %.2f)", fpitch, froll);
+//            ESP_LOGD(TAG, "give mutex");
 
 //            /* MPU6050 data details */
 //            count++;
@@ -130,10 +119,10 @@ static void vTaskMpu6050(void *pvParameters) {
 //            printf(" Roll:%6.3f ", roll);
 //            printf(" FPitch:%6.3f ", fpitch);
 //            printf(" FRoll:%6.3f \n", froll);
-            vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
-        } else {
-            ESP_LOGD(TAG, "fail to take mutex");
-        }
+        vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
+//        } else {
+//            ESP_LOGD(TAG, "fail to take mutex");
+//        }
     }
     vTaskDelete(nullptr);
 
@@ -157,34 +146,34 @@ static void vTaskTcpClient(void *pvParameters) {
 
     for (;;) {
         ESP_LOGD(TAG, "wake at %lu", (unsigned long) xLastWakeTime);
-        ESP_LOGD(TAG, "take MPU mutex");
-        if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
-            MpuData_p->fpitch = ((mpuData_t *) sharedMpuData_p->data_p)->fpitch;
-            MpuData_p->froll = ((mpuData_t *) sharedMpuData_p->data_p)->froll;
-            xSemaphoreGive(sharedMpuData_p->mutex);
+//        ESP_LOGD(TAG, "take MPU mutex");
+//        if (xSemaphoreTake(sharedMpuData_p->mutex, 0) == pdTRUE) {
+        MpuData_p->fpitch = ((mpuData_t *) sharedMpuData_p->data_p)->fpitch;
+        MpuData_p->froll = ((mpuData_t *) sharedMpuData_p->data_p)->froll;
+//            xSemaphoreGive(sharedMpuData_p->mutex);
 //            ESP_LOGI(TAG, "from MPU mutex: %.2f, %.2f", MpuData_p->fpitch, MpuData_p->froll);
-            ESP_LOGD(TAG, "give MPU mutex");
-        } else {
-            ESP_LOGD(TAG, "fail to take MPU mutex");
-        }
+//            ESP_LOGD(TAG, "give MPU mutex");
+//        } else {
+//            ESP_LOGD(TAG, "fail to take MPU mutex");
+//        }
 
-        ESP_LOGD(TAG, "take BUTTON mutex");
-        if (xSemaphoreTake(sharedButtonData_p->mutex, 0) == pdTRUE) {
-            for (int button_idx = 0; button_idx < 3; button_idx++) {
-                buttonData_p[button_idx] = (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx];
-            }
-            xSemaphoreGive(sharedButtonData_p->mutex);
-//            ESP_LOGI(TAG, "from BUTTON mutex: %d, %d, %d", buttonsData_p[0], buttonsData_p[1], buttonsData_p[2]);
-            ESP_LOGD(TAG, "give BUTTON mutex");
-        } else {
-            ESP_LOGD(TAG, "fail to take BUTTON mutex");
+//        ESP_LOGD(TAG, "take BUTTON mutex");
+//        if (xSemaphoreTake(sharedButtonData_p->mutex, 0) == pdTRUE) {
+        for (int button_idx = 0; button_idx < 3; button_idx++) {
+            buttonData_p[button_idx] = (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx];
         }
+//            xSemaphoreGive(sharedButtonData_p->mutex);
+//            ESP_LOGI(TAG, "from BUTTON mutex: %d, %d, %d", buttonsData_p[0], buttonsData_p[1], buttonsData_p[2]);
+//            ESP_LOGD(TAG, "give BUTTON mutex");
+//        } else {
+//            ESP_LOGD(TAG, "fail to take BUTTON mutex");
+//        }
 
         sprintf(msg, "%.2f, %.2f, %d, %d, %d", MpuData_p->fpitch, MpuData_p->froll, buttonData_p[0], buttonData_p[1],
                 buttonData_p[2]);
 
         client.send(msg);
-//        ESP_LOGI(TAG, "send %s", msg);
+        ESP_LOGI(TAG, "send %s", msg);
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -195,8 +184,9 @@ static void vTaskButton(void *pvParameters) {
     auto *sharedButtonData_p = (struct sharedData_t *) pvParameters;
 
     TickType_t lastBounceTime = 0;
-    static int lastBounceState[3] = {LOW, LOW, LOW};
-    static int buttonStates[3] = {LOW, LOW, LOW};
+    const int button_num = 3;
+    static int lastBounceState[button_num] = {LOW, LOW, LOW};
+    static int buttonStates[button_num] = {LOW, LOW, LOW};
     gpio_set_pull_mode(record_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(color_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(move_button_pin, GPIO_PULLUP_ONLY);
@@ -205,7 +195,7 @@ static void vTaskButton(void *pvParameters) {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        for (int button_idx = 0; button_idx < 3; button_idx++) {
+        for (int button_idx = 0; button_idx < button_num; button_idx++) {
 
             // read the level of button pin, and turn the voltage level to logical truth
             int currentState = (1 - gpio_get_level(button_pins[button_idx]));
@@ -220,17 +210,17 @@ static void vTaskButton(void *pvParameters) {
             }
 
         }
-        ESP_LOGD(TAG, "take mutex");
-        if (xSemaphoreTake(sharedButtonData_p->mutex, 50) == pdTRUE) {
-            for (int button_idx = 0; button_idx < 3; button_idx++) {
-                (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx] = buttonStates[button_idx];
-            }
-            xSemaphoreGive(sharedButtonData_p->mutex);
-//            ESP_LOGI(TAG, "Button states (%d, %d, %d)", buttonStates[0], buttonStates[1], buttonStates[2]);
-            ESP_LOGD(TAG, "give mutex");
-        } else {
-            ESP_LOGD(TAG, "fail to take mutex");
+//        ESP_LOGD(TAG, "take mutex");
+//        if (xSemaphoreTake(sharedButtonData_p->mutex, 50) == pdTRUE) {
+        for (int button_idx = 0; button_idx < 3; button_idx++) {
+            (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx] = buttonStates[button_idx];
         }
+//            xSemaphoreGive(sharedButtonData_p->mutex);
+//            ESP_LOGI(TAG, "Button states (%d, %d, %d)", buttonStates[0], buttonStates[1], buttonStates[2]);
+//            ESP_LOGD(TAG, "give mutex");
+//        } else {
+//            ESP_LOGD(TAG, "fail to take mutex");
+//        }
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -270,7 +260,7 @@ extern "C" void app_main() {
     xTaskCreate(vTaskMpu6050, "vTaskMpu6050", 4096, sharedMpuData_p, 2, &mpu6050_handle);
 
     TaskHandle_t tcp_client_handle;
-    xTaskCreate(vTaskTcpClient, "vTaskTcpClient", 4096, tcpClientParameter_p, 1, &tcp_client_handle);
+    xTaskCreate(vTaskTcpClient, "vTaskTcpClient", 4096, tcpClientParameter_p, 5, &tcp_client_handle);
 
     TaskHandle_t button_handle;
     xTaskCreate(vTaskButton, "vTaskButton", 4096, sharedButtonData_p, 2, &button_handle);

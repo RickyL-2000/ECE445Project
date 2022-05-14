@@ -70,10 +70,13 @@ void tcp_server_task(void *pvParameters) {
         }
 
         // Set tcp keepalive option
-        setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
-        setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
-        setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
-        setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
+//        int nZero=100; //and now the default buffer is 8192
+//        setsockopt(sock,SOL_SOCKET,SO_RCVBUF,(char *)&nZero,sizeof(nZero));
+//        setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
+//        setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
+//        setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
+//        setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
+
         // Convert ip address to string
         if (source_addr.ss_family == PF_INET) {
             inet_ntoa_r(((struct sockaddr_in *) &source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
@@ -101,11 +104,7 @@ void tcp_server_task(void *pvParameters) {
                 // read all the current pack from socket buffer, avoiding influence the next pack
                 if (slen > buffer_size) {
                     ESP_LOGE(TAG, "slen: %lu is larger than buffer size, this pack is dropped!", slen);
-                    while (slen > 0) {
-                        recv_len = recv(sock, output_buffer, slen > buffer_size ? buffer_size : slen, 0);
-                        slen -= recv_len;
-                    }
-                    continue;
+                    break;
                 }
                 recv_len = recv(sock, output_buffer, slen, 0);
                 if (recv_len < 0) {
@@ -116,8 +115,10 @@ void tcp_server_task(void *pvParameters) {
                     output_buffer[slen] = 0; // Null-terminate whatever is received and treat it like a string
                     ESP_LOGD(TAG, "Received %d bytes: %s", recv_len, output_buffer);
                 }
-                sscanf(output_buffer, "(%f, %f), (%u, %u, %u)", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
+                sscanf(output_buffer, "%f, %f, %u, %u, %u", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
                        &(ledCommend.B));
+//                ESP_LOGI(TAG, "%f, %f, %u, %u, %u", pitch, roll, (ledCommend.R), (ledCommend.G),
+//                         (ledCommend.B));
 
                 // queue send will copy the content of the given pointer. So the buffer can be dynamically allocated.
                 xQueueSend((parameters->commandQueues_p)->pitchQueue, &pitch, 0);
@@ -126,9 +127,9 @@ void tcp_server_task(void *pvParameters) {
 
             }
         } while (recv_len > 0);
-
         shutdown(sock, 0);
         close(sock);
+        ESP_LOGW(TAG, "exit socket session");
     }
     vTaskDelete(nullptr);
 }
@@ -192,11 +193,11 @@ void servo_pitch_task(void *pvParameters) {
     float pitch;
     float sum_pitch = 0.0;
 //    const float lambda = 0.2;
-    const int k_size = 10;
+    const int k_size = 20;
     int index = 0;
     float pitch_lst[k_size] = {0};
 
-    Servo servo_pitch(DS3218, SERVO_YAW_GPIO,
+    Servo servo_pitch(DS3218, SERVO_PITCH_GPIO,
                       MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
@@ -205,25 +206,8 @@ void servo_pitch_task(void *pvParameters) {
     for (;;) {
         if (xQueueReceive(commandQueues->pitchQueue, &pitch, 0) == pdTRUE) {
 
-            sum_pitch += pitch - pitch_lst[index];
-            pitch_lst[index] = pitch;
-//            sum_pitch = lambda * pitch + (1 - lambda) * sum_pitch;
-//            sum_pitch = ;
-//            for (int idx = 0; idx < k_size; idx++) {
-//                sum_pitch += pitch_lst[idx];
-//            }
-//            sum_pitch /= k_size;
-            index = (index + 1) % k_size;
-            ESP_ERROR_CHECK(servo_pitch.set_angle(sum_pitch / k_size));
-            ESP_LOGI(TAG, "%.2f ", sum_pitch / k_size);
-//            ESP_LOGI(TAG,
-//                     "%.2f | %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
-//                     sum_pitch / k_size,
-//                     pitch_lst[0], pitch_lst[1], pitch_lst[2], pitch_lst[3], pitch_lst[4], pitch_lst[5], pitch_lst[6],
-//                     pitch_lst[7], pitch_lst[8], pitch_lst[9],
-//                     pitch_lst[10], pitch_lst[11], pitch_lst[12], pitch_lst[13], pitch_lst[14], pitch_lst[15],
-//                     pitch_lst[16], pitch_lst[17], pitch_lst[18], pitch_lst[19]
-//            );
+            ESP_LOGI(TAG, "%.2f ", pitch);
+            ESP_ERROR_CHECK(servo_pitch.set_angle(pitch));
         }
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
@@ -249,19 +233,8 @@ void servo_yaw_task(void *pvParameters) {
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
         if (xQueueReceive(commandQueues->yawQueue, &yaw, 0) == pdTRUE) {
-
-            sum_yaw += yaw - yaw_lst[index];
-            yaw_lst[index] = yaw;
-//            sum_yaw = lambda * yaw + (1 - lambda) * sum_yaw;
-//            sum_yaw = ;
-//            for (int idx = 0; idx < k_size; idx++) {
-//                sum_yaw += yaw_lst[idx];
-//            }
-//            sum_yaw /= k_size;
-            index = (index + 1) % k_size;
-            ESP_ERROR_CHECK(servo_yaw.set_angle(sum_yaw / k_size));
+            ESP_ERROR_CHECK(servo_yaw.set_angle(yaw));
         }
-
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
     vTaskDelete(nullptr);
@@ -323,18 +296,18 @@ extern "C" void app_main() {
 
     TaskHandle_t led_control_handle;
     xTaskCreate(led_control_task, "led_control", 4096,
-                commandQueues_p, 5, &led_control_handle);
+                commandQueues_p, 2, &led_control_handle);
 
     TaskHandle_t servo_pitch_handle;
     xTaskCreate(servo_pitch_task, "servo_pitch", 4096,
-                commandQueues_p, 5, &servo_pitch_handle);
-
+                commandQueues_p, 2, &servo_pitch_handle);
+//
 //    TaskHandle_t servo_yaw_handle;
 //    xTaskCreate(servo_yaw_task, "servo_yaw", 4096,
-//                commandQueues_p, 5, &servo_yaw_handle);
-
+//                commandQueues_p, 2, &servo_yaw_handle);
+////
 //    TaskHandle_t dummy_control_handle;
 //    xTaskCreate(dummy_control_task, "dummy_control", 4096,
-//                commandQueues_p, 5, &dummy_control_handle);
+//                commandQueues_p, 2, &dummy_control_handle);
 
 }
