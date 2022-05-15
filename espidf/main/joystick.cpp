@@ -24,6 +24,7 @@ static gpio_num_t i2c_gpio_scl = (gpio_num_t) 2;
 static gpio_num_t color_button_pin = (gpio_num_t) 12;
 static gpio_num_t move_button_pin = (gpio_num_t) 13;
 static gpio_num_t record_button_pin = (gpio_num_t) 14;
+static gpio_num_t music_button_pin = (gpio_num_t) 15;
 
 static gpio_num_t button_pins[3] = {move_button_pin, color_button_pin, record_button_pin};
 
@@ -184,12 +185,13 @@ static void vTaskButton(void *pvParameters) {
     auto *sharedButtonData_p = (struct sharedData_t *) pvParameters;
 
     TickType_t lastBounceTime = 0;
-    const int button_num = 3;
+    const int button_num = 4;
     static int lastBounceState[button_num] = {LOW, LOW, LOW};
     static int buttonStates[button_num] = {LOW, LOW, LOW};
     gpio_set_pull_mode(record_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(color_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(move_button_pin, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(music_button_pin, GPIO_PULLUP_ONLY);
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
