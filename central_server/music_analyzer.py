@@ -16,10 +16,12 @@ class MusicAnalyzer:
         self.recognizer = imp.load_pickle("emotion_recog", "model.pt")
 
         # self.color_queue = queue.Queue(-1)
-        self.color_seq = []
+        self.rgb_seq = []
+        self.hsv_seq = []
         self.sr = 0.0
 
-        self.cache = {}
+        self.rgb_cache = {}
+        self.hsv_cache = {}
 
     def emotion_recog(self, mel, channel=80):
         mel = mel[:channel, :]
@@ -46,13 +48,14 @@ class MusicAnalyzer:
         """
         print("Start analyzing...")
 
-        if os.path.basename(f_path) in self.cache:
+        if os.path.basename(f_path) in self.rgb_cache:
             print("Load from cache...")
-            self.color_seq = self.cache[os.path.basename(f_path)]
+            self.rgb_seq = self.rgb_cache[os.path.basename(f_path)]
+            self.hsv_seq = self.hsv_cache[os.path.basename(f_path)]
             print("Analysis done.")
             return
 
-        self.color_seq = []
+        self.rgb_seq = []
 
         y, fs = load_audio(f_path)
         hue_map = np.zeros(math.ceil(len(y)/hop_length))
@@ -100,13 +103,18 @@ class MusicAnalyzer:
 
         r, g, b = hsv2rgb(hue_map, saturation_map, value_map)
 
-        for R, G, B, t in zip(r, g, b, times):
-            self.color_seq.append(((int(R), int(G), int(B)), t))
+        for R, G, B, H, S, V, t in zip(r, g, b, hue_map, saturation_map, value_map, times):
+            self.rgb_seq.append(((int(R), int(G), int(B)), t))
+            self.hsv_seq.append(((H, S, V), t))
 
-        self.cache[os.path.basename(f_path)] = self.color_seq
+        self.rgb_cache[os.path.basename(f_path)] = self.rgb_seq
+        self.hsv_cache[os.path.basename(f_path)] = self.hsv_seq
 
         print("Analysis done.")
 
-    def get_color(self, music_pos):
+    def get_color(self, music_pos, code="rgb"):
         # music_pos: in sec
-        return self.color_seq[int(music_pos * self.sr)]
+        if code == "rgb" or code == "RGB":
+            return self.rgb_seq[int(music_pos * self.sr)]
+        elif code == "hsv" or code == "HSV":
+            return self.hsv_seq[int(music_pos * self.sr)]
