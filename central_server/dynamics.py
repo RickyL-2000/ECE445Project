@@ -3,19 +3,17 @@ from utils.config import PC_IP, DYNAMICS_PORT
 from threading import Thread, Lock
 import math
 import parse
-from queue import Queue
-from utils.circular_queue import CircularQueue
 
 ORIGIN_UPPER = 180
-THETA_REMAP = 135
-PHI_REMAP = 135
+PITCH_REMAP = 135
+ROLL_REMAP = 180
 
 
 class Dynamics:
     """
     This the dynamics subsystem. Preprocessing the posture data sequence from the joysticks,
     do the spatial and temporal remapping.
-    Note: The angle variable: (theta,phi) will only be unpacked in this subsystem!
+    Note: The angle variable: (pitch,roll) will only be unpacked in this subsystem!
         All other parts should take them as a whole posture data tuple.
     """
 
@@ -30,8 +28,8 @@ class Dynamics:
         self._joystick_data = ((0, 0), (0, 0, 0))
         self.updated = False
         self.last_buffer_len = 20
-        self.last_theta = [0] * self.last_buffer_len
-        self.last_phi = [0] * self.last_buffer_len
+        self.last_pitch = [0] * self.last_buffer_len
+        self.last_roll = [0] * self.last_buffer_len
         self.count = 1
 
     @property
@@ -50,12 +48,12 @@ class Dynamics:
         self.joystick_lock.release()
 
     def recv(self, msg):
-        theta, phi, move, color, record = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}", msg)
+        pitch, roll, move, color, record = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}", msg)
 
-        theta, phi = Dynamics.spatial_remap(theta, phi)
-        theta, phi = self.temporal_remap(theta, phi)
+        pitch, roll = Dynamics.spatial_remap(pitch, roll)
+        pitch, roll = self.temporal_remap(pitch, roll)
 
-        data = ((theta, phi), (move, color, record))  # (posture,buttons)
+        data = ((pitch, roll), (move, color, record))  # (posture,buttons)
 
         self.joystick_data = data
 
@@ -64,20 +62,20 @@ class Dynamics:
         return remap_upper * math.sin(value * math.pi / origin_upper / 2)
 
     @classmethod
-    def spatial_remap(cls, theta, phi):
-        theta = Dynamics.nonlinear_cut(theta, ORIGIN_UPPER, THETA_REMAP)
-        phi = Dynamics.nonlinear_cut(phi, ORIGIN_UPPER, PHI_REMAP)
-        return theta, phi
+    def spatial_remap(cls, pitch, roll):
+        pitch = Dynamics.nonlinear_cut(pitch, ORIGIN_UPPER, PITCH_REMAP)
+        roll = Dynamics.nonlinear_cut(roll, ORIGIN_UPPER, ROLL_REMAP)
+        return pitch, roll
 
-    def temporal_remap(self, theta, phi):
+    def temporal_remap(self, pitch, roll):
         # when shake severely, the value will be it's opposite for a few sample data, we need to handle it here
-        self.last_theta[self.count] = theta
-        self.last_phi[self.count] = phi
-        sign_theta = 1 if sum(self.last_theta) > 0 else -1
-        sign_phi = 1 if sum(self.last_phi) > 0 else -1
+        self.last_pitch[self.count] = pitch
+        self.last_roll[self.count] = roll
+        sign_pitch = 1 if sum(self.last_pitch) > 0 else -1
+        sign_roll = 1 if sum(self.last_roll) > 0 else -1
         self.count = (self.count + 1) % self.last_buffer_len
 
-        return sign_theta * abs(theta), sign_phi * abs(phi)
+        return sign_pitch * abs(pitch), sign_roll * abs(roll)
 
 
 if __name__ == "__main__":

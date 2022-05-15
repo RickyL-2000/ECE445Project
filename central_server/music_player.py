@@ -163,6 +163,7 @@ class MusicPlayer:
             self.cur_music_pos = 0.0  # in sec
 
     def get_color(self, code="rgb"):
+        """code: rgb/RGB / hsv/HSV """
         return self.music_analyzer.get_color(self.cur_music_pos, code=code)
 
     def gen_color_seq(self):

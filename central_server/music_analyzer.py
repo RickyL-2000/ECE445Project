@@ -114,7 +114,10 @@ class MusicAnalyzer:
 
     def get_color(self, music_pos, code="rgb"):
         # music_pos: in sec
-        if code == "rgb" or code == "RGB":
-            return self.rgb_seq[int(music_pos * self.sr)]
-        elif code == "hsv" or code == "HSV":
-            return self.hsv_seq[int(music_pos * self.sr)]
+        if code.lower() == "rgb":
+            return self.rgb_seq[int(music_pos * self.sr)][0]
+        elif code.lower() == "hsv":
+            return self.hsv_seq[int(music_pos * self.sr)][0]
+        elif code.lower() == "both":
+            return (self.rgb_seq[int(music_pos * self.sr)][0],
+                    self.hsv_seq[int(music_pos * self.sr)][0])
