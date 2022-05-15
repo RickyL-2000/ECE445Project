@@ -34,6 +34,7 @@ static gpio_num_t button_pins[3] = {move_button_pin, color_button_pin, record_bu
 #define LOW 0
 #define PRESS 1
 #define RELEASE 0
+#define BUTTON_NUM 4
 
 typedef struct mpuData_t {
     float fpitch;
@@ -170,8 +171,8 @@ static void vTaskTcpClient(void *pvParameters) {
 //            ESP_LOGD(TAG, "fail to take BUTTON mutex");
 //        }
 
-        sprintf(msg, "%.2f, %.2f, %d, %d, %d", MpuData_p->fpitch, MpuData_p->froll, buttonData_p[0], buttonData_p[1],
-                buttonData_p[2]);
+        sprintf(msg, "%.2f, %.2f, %d, %d, %d, %d", MpuData_p->fpitch, MpuData_p->froll, buttonData_p[0], buttonData_p[1],
+                buttonData_p[2],buttonData_p[3]);
 
         client.send(msg);
         ESP_LOGI(TAG, "send %s", msg);
@@ -185,9 +186,8 @@ static void vTaskButton(void *pvParameters) {
     auto *sharedButtonData_p = (struct sharedData_t *) pvParameters;
 
     TickType_t lastBounceTime = 0;
-    const int button_num = 4;
-    static int lastBounceState[button_num] = {LOW, LOW, LOW};
-    static int buttonStates[button_num] = {LOW, LOW, LOW};
+    static int lastBounceState[BUTTON_NUM] = {LOW, LOW, LOW};
+    static int buttonStates[BUTTON_NUM] = {LOW, LOW, LOW};
     gpio_set_pull_mode(record_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(color_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(move_button_pin, GPIO_PULLUP_ONLY);
@@ -197,7 +197,7 @@ static void vTaskButton(void *pvParameters) {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        for (int button_idx = 0; button_idx < button_num; button_idx++) {
+        for (int button_idx = 0; button_idx < BUTTON_NUM; button_idx++) {
 
             // read the level of button pin, and turn the voltage level to logical truth
             int currentState = (1 - gpio_get_level(button_pins[button_idx]));
@@ -214,7 +214,7 @@ static void vTaskButton(void *pvParameters) {
         }
 //        ESP_LOGD(TAG, "take mutex");
 //        if (xSemaphoreTake(sharedButtonData_p->mutex, 50) == pdTRUE) {
-        for (int button_idx = 0; button_idx < 3; button_idx++) {
+        for (int button_idx = 0; button_idx < BUTTON_NUM; button_idx++) {
             (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx] = buttonStates[button_idx];
         }
 //            xSemaphoreGive(sharedButtonData_p->mutex);
@@ -251,7 +251,7 @@ extern "C" void app_main() {
     auto *sharedButtonData_p = (sharedData_t *) malloc(sizeof(sharedData_t));
     sharedButtonData_p->mutex = xSemaphoreCreateMutex();
     // pointer to a 3 length buttonsData_p array
-    auto *buttonsData_p = (buttonData_t(*)[]) malloc(sizeof(buttonData_t) * 3);
+    auto *buttonsData_p = (buttonData_t(*)[]) malloc(sizeof(buttonData_t) * BUTTON_NUM);
     sharedButtonData_p->data_p = (void *) buttonsData_p;
 
     auto *tcpClientParameter_p = (tcpClientParameter_t *) malloc(sizeof(tcpClientParameter_t));
@@ -266,20 +266,5 @@ extern "C" void app_main() {
 
     TaskHandle_t button_handle;
     xTaskCreate(vTaskButton, "vTaskButton", 4096, sharedButtonData_p, 2, &button_handle);
-
-
-
-    //    TaskHandle_t record_button_handle;
-//    xTaskCreate(record_button_f, "record_button_f", 4096, sharedMpuData_p, 1, &record_button_handle);
-//
-//    TaskHandle_t move_button_handle;
-//    xTaskCreate(stop_button_f, "stop_button_f", 4096, sharedMpuData_p, 2, &move_button_handle);
-//
-//    TaskHandle_t repeat_button_handle;
-//    xTaskCreate(repeat_button_f, "repeat_button_f", 4096, sharedMpuData_p, 2, &repeat_button_handle);
-
-//    TaskHandle_t tcp_server_handle;
-//    xTaskCreate(tcp_server_task, "tcp_server", 4096, (void *) AF_INET, 5, &tcp_server_handle);
-
 
 }
