@@ -114,7 +114,7 @@ class Control:
         self.cur_command_lock.release()
 
     def __repr__(self):
-        return f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, record_len:{len(self.record_buffer)} command:{self.cur_command}"
+        return f"music_play:{self.music_player.get_busy()} gimbal:{self.gimbal_fsm.state}, color:{self.color_fsm.state}, record_len:{len(self.record_buffer)} command:{self.cur_command}"
 
     def connect_lights(self, light_id, light_config):
         self.light_connections[light_id] = Channel(light_id).becomeClient(light_config["host"], light_config["port"])
@@ -137,15 +137,14 @@ class Control:
                 self.record_buffer = []
                 self.repeat_count = 0
 
-        if play !=self.last_button_state[3]:
+        if play != self.last_button_state[3]:
+            print(f"play change to: {play}")
             if play:
                 self.music_player.unpause()
             else:
                 self.music_player.pause()
-            
 
-
-        self.last_button_state = (move, color, record,play)
+        self.last_button_state = (move, color, record, play)
 
     def filter(self, dynamics_posture, music_analysis_color, hsv):
         if self.gimbal_fsm.state == "mimic":
@@ -189,18 +188,19 @@ class Control:
             self.command_queue: string type command for the light arrays
                 format: "(theta, phi), (R, G, B)"
         """
-        d_posture, buttons = (0.0, 0.0), (0, 0, 0,0)
+        d_posture, buttons = (0.0, 0.0), (0, 0, 0, 0)
         posture_cache = [(0, 0)]
         while True:
             # ============  get posture data from joystick
             if self.dynamics.updated:
                 d_posture, buttons = self.dynamics.joystick_data
-                # print(f"recv from dynamics {d_posture}")
+                # print(f"recv from dynamics {d_posture, buttons}")
 
             # ============  get color data from music analysis subsystem, according the play states
             if self.music_player.get_busy():
-                m_color, hsv = self.music_player.get_color("both")
+                m_color, hsv = self.music_player.get_color()
                 # pure green indicates no music is playing
+                # m_color, hsv = (0, 255, 0), (0, 0, 0)
             else:
                 m_color, hsv = (0, 255, 0), (0, 0, 0)
 
@@ -244,15 +244,12 @@ class Control:
         # self.music_player.play()
         recv_t = Thread(target=self.recv, daemon=True)
         send_t = Thread(target=self.send, daemon=True)
-        player_t = Thread(target=self.music_player.run, daemon=True)
         monitor_t = Thread(target=self.monitor, daemon=True)
 
-        player_t.start()
         recv_t.start()
         send_t.start()
         # monitor_t.start()
 
         recv_t.join()
         send_t.join()
-        player_t.join()
         # monitor_t.join()

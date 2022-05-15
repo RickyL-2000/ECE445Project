@@ -19,15 +19,6 @@
 
 #include "esp_timer.h"
 
-static gpio_num_t i2c_gpio_sda = (gpio_num_t) 15;
-static gpio_num_t i2c_gpio_scl = (gpio_num_t) 2;
-static gpio_num_t color_button_pin = (gpio_num_t) 12;
-static gpio_num_t move_button_pin = (gpio_num_t) 13;
-static gpio_num_t record_button_pin = (gpio_num_t) 14;
-static gpio_num_t play_button_pin = (gpio_num_t) 19;
-
-static gpio_num_t button_pins[3] = {move_button_pin, color_button_pin, record_button_pin};
-
 #define I2C_NUM I2C_NUM_0
 #define DEBOUNCE_TIME (50/portTICK_PERIOD_MS)
 #define HIGH 1
@@ -35,6 +26,17 @@ static gpio_num_t button_pins[3] = {move_button_pin, color_button_pin, record_bu
 #define PRESS 1
 #define RELEASE 0
 #define BUTTON_NUM 4
+
+
+static gpio_num_t i2c_gpio_sda = (gpio_num_t) 15;
+static gpio_num_t i2c_gpio_scl = (gpio_num_t) 2;
+static gpio_num_t move_button_pin = (gpio_num_t) 18;
+static gpio_num_t color_button_pin = (gpio_num_t) 13;
+static gpio_num_t record_button_pin = (gpio_num_t) 5;
+static gpio_num_t play_button_pin = (gpio_num_t) 19;
+
+static gpio_num_t button_pins[BUTTON_NUM] = {move_button_pin, color_button_pin, record_button_pin,play_button_pin};
+
 
 typedef struct mpuData_t {
     float fpitch;
@@ -139,7 +141,7 @@ static void vTaskTcpClient(void *pvParameters) {
     TcpClient client;
     auto *msg = (char *) malloc(sizeof(char) * 50);
     auto *MpuData_p = (mpuData_t *) malloc(sizeof(mpuData_t));
-    auto *buttonData_p = (buttonData_t *) malloc(sizeof(buttonData_t) * 3); // pointer to a 3 length buttonsData_p array
+    auto *buttonData_p = (buttonData_t *) malloc(sizeof(buttonData_t) * BUTTON_NUM); // pointer to a 3 length buttonsData_p array
 
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
@@ -161,7 +163,7 @@ static void vTaskTcpClient(void *pvParameters) {
 
 //        ESP_LOGD(TAG, "take BUTTON mutex");
 //        if (xSemaphoreTake(sharedButtonData_p->mutex, 0) == pdTRUE) {
-        for (int button_idx = 0; button_idx < 3; button_idx++) {
+        for (int button_idx = 0; button_idx < BUTTON_NUM; button_idx++) {
             buttonData_p[button_idx] = (*((buttonData_t (*)[]) sharedButtonData_p->data_p))[button_idx];
         }
 //            xSemaphoreGive(sharedButtonData_p->mutex);
@@ -188,9 +190,9 @@ static void vTaskButton(void *pvParameters) {
     TickType_t lastBounceTime = 0;
     static int lastBounceState[BUTTON_NUM] = {LOW, LOW, LOW};
     static int buttonStates[BUTTON_NUM] = {LOW, LOW, LOW};
-    gpio_set_pull_mode(record_button_pin, GPIO_PULLUP_ONLY);
-    gpio_set_pull_mode(color_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(move_button_pin, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(color_button_pin, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(record_button_pin, GPIO_PULLUP_ONLY);
     gpio_set_pull_mode(play_button_pin, GPIO_PULLUP_ONLY);
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;

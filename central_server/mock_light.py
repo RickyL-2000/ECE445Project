@@ -5,8 +5,8 @@ import parse
 
 
 def recv(msg):
-    theta, phi = parse.parse("({:f}, {:f})", msg.split(", (")[0])
-    print(f"{theta:.2f}, {phi:.2f}")
+    cmd = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}", msg.split(", (")[0])
+    print(f"{', '.join([str(x) for x in cmd])}")
 
 
 c = Channel("mock_light")

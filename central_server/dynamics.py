@@ -3,10 +3,12 @@ from utils.config import PC_IP, DYNAMICS_PORT
 from threading import Thread, Lock
 import math
 import parse
+from queue import Queue
+from utils.circular_queue import CircularQueue
 
 ORIGIN_UPPER = 180
-PITCH_REMAP = 135
-ROLL_REMAP = 180
+PITCH_REMAP = 90
+ROLL_REMAP = 135
 
 
 class Dynamics:
@@ -25,7 +27,7 @@ class Dynamics:
 
         # self.joystick_queue = Queue(10)
         self.joystick_lock = Lock()
-        self._joystick_data = ((0, 0), (0, 0, 0,0))
+        self._joystick_data = ((0, 0), (0, 0, 0, 0))
         self.updated = False
         self.last_buffer_len = 20
         self.last_pitch = [0] * self.last_buffer_len
@@ -48,7 +50,8 @@ class Dynamics:
         self.joystick_lock.release()
 
     def recv(self, msg):
-        pitch, roll, move, color, record,play = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}, {:d}", msg)
+        # print(msg)
+        pitch, roll, move, color, record, play = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}, {:d}", msg)
 
         pitch, roll = Dynamics.spatial_remap(pitch, roll)
         pitch, roll = self.temporal_remap(pitch, roll)
