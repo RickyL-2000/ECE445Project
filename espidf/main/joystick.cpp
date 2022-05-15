@@ -24,7 +24,7 @@ static gpio_num_t i2c_gpio_scl = (gpio_num_t) 2;
 static gpio_num_t color_button_pin = (gpio_num_t) 12;
 static gpio_num_t move_button_pin = (gpio_num_t) 13;
 static gpio_num_t record_button_pin = (gpio_num_t) 14;
-static gpio_num_t music_button_pin = (gpio_num_t) 15;
+static gpio_num_t music_button_pin = (gpio_num_t) 16;
 
 static gpio_num_t button_pins[3] = {move_button_pin, color_button_pin, record_button_pin};
 

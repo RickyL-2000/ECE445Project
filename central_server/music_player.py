@@ -49,6 +49,7 @@ class MusicPlayer:
             "prev_bt": pygame.image.load("images/Player, prev.png"),
             "pause_bt": pygame.image.load("images/Player, pause.png"),
             "stop_bt": pygame.image.load("images/Player, stop.png"),
+            "refresh_bt": pygame.image.load("images/refresh.png"),
             "play_bt_fill": pygame.image.load("images/Player, play (fill).png"),
             "next_bt_fill": pygame.image.load("images/Player, next (fill).png"),
             "prev_bt_fill": pygame.image.load("images/Player, prev (fill).png"),
@@ -64,7 +65,7 @@ class MusicPlayer:
             "play_bt": Button(self.surfaces["play_bt"], name="play_bt", size=(80, 80), pos=(465, 490)),
             "stop_bt": Button(self.surfaces["stop_bt"], name="stop_bt", size=(80, 80), pos=(360, 490)),
             "prev_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(255, 490)),
-            "refresh_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(150, 490)),
+            "refresh_bt": Button(self.surfaces["refresh_bt"], name="refresh_bt", size=(54, 54), pos=(155, 503)),
             "p_bar": ProgressBar(self.surfaces["circle"], name="p_bar", size=(30, 30), pos=(100, 470), length=600,
                                  src=(100, 470), dst=(700, 470), height=2, line_color=(0, 100, 100)),
             "text_lst": TextList(None, name="text_lst", size=(500, 250), pos=(130, 80), num=5, spacing=10,
@@ -154,9 +155,7 @@ class MusicPlayer:
             elif cur_music_idx >= 0:
                 self.cur_music_idx = cur_music_idx
             for file in self.music_files:
-                # TODO: this may need a lock
                 if os.path.exists(file):
-                    # print(file)
                     pygame.mixer.music.queue(file)
         else:
             self.stop()
@@ -191,7 +190,6 @@ class MusicPlayer:
         self.running = True
         while self.running:
 
-            self._update_music_files()
             for i in range(len(self.components["text_lst"])):
                 if i + self.cursor < len(self.music_files):
                     self.components["text_lst"][i]\
@@ -209,6 +207,7 @@ class MusicPlayer:
             self.components["next_bt"].display(self.screen)
             self.components["prev_bt"].display(self.screen)
             self.components["stop_bt"].display(self.screen)
+            self.components["refresh_bt"].display(self.screen)
             self.components["text_lst"].display(self.screen)
             self.components["msg_box"].display(self.screen)
 
@@ -262,8 +261,9 @@ class MusicPlayer:
                     elif self.components["prev_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
                         self.prev_music()
                     elif self.components["stop_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
-                        self.components["play_bt"].set_surface(self.surfaces["play_bt"])
                         self.stop()
+                    elif self.components["refresh_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
+                        self._update_music_files()
                     # wheel
                     elif self.components["text_lst"].check_hover(mouse_x, mouse_y):
                         if event.button == 4:   # slid up
