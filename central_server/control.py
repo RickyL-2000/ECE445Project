@@ -55,7 +55,7 @@ class RandomGenerator:
 
 
 class Control:
-    def __init__(self, dynamics, music_analysis, music_player, lights_config, ):
+    def __init__(self, dynamics, music_player, lights_config, ):
         """
         :param lights_config: socket client information of light arrays, with form
                 { "lightA":
@@ -70,7 +70,6 @@ class Control:
         self.color_fsm = Color()
         self.random_gene = RandomGenerator()
         self.dynamics = dynamics
-        self.music_analysis = music_analysis
         self.music_player = music_player
         self.command_queue = queue.Queue(1000)
         self.light_connections = {}
@@ -176,7 +175,9 @@ class Control:
             # ============  get color data from music analysis subsystem, according the play states
             if self.music_player.get_busy():
                 try:
-                    m_color, color_time = self.music_analysis.color_queue.get(block=False)
+                    # m_color, color_time = self.music_analysis.color_queue.get(block=False)
+                    m_color, color_time = self.music_player.get_color()
+                    print(m_color, color_time)
                 except queue.Empty as e:
                     # FIXME: The queue should never be empty with the as the color data is preprocessed in the dynamic subsystem
                     # pure blue indicates queue empty
@@ -227,12 +228,15 @@ class Control:
         # self.music_player.play()
         recv_t = Thread(target=self.recv, daemon=True)
         send_t = Thread(target=self.send, daemon=True)
+        player_t = Thread(target=self.music_player.run, daemon=True)
         monitor_t = Thread(target=self.monitor, daemon=True)
 
         recv_t.start()
         send_t.start()
+        player_t.start()
         # monitor_t.start()
 
         recv_t.join()
         send_t.join()
+        player_t.join()
         # monitor_t.join()
