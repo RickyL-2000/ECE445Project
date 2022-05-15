@@ -76,7 +76,7 @@ class Control:
         self.music_player = music_player
 
         # buttons
-        self.last_button_state = [0, 0, 0]
+        self.last_button_state = [0, 0, 0,0]
 
         self.light_connections = {}
 
@@ -121,7 +121,7 @@ class Control:
         self.light_connections[light_id] = Channel(light_id).becomeClient(light_config["host"], light_config["port"])
 
     def button_trigger(self, buttons):
-        move, color, record = tuple([x == 1 for x in buttons])
+        move, color, record, play = tuple([x == 1 for x in buttons])
 
         # when move button is changed from 0 to 1
         if move == True and move != self.last_button_state[0]:
@@ -137,7 +137,15 @@ class Control:
             if self.gimbal_fsm.is_record():
                 self.record_buffer = []
 
-        self.last_button_state = (move, color, record)
+        if play !=self.last_button_state[3]:
+            if play:
+                self.music_player.unpause()
+            else:
+                self.music_player.pause()
+            
+
+
+        self.last_button_state = (move, color, record,play)
 
     def filter(self, dynamics_posture, music_analysis_color,hsv):
         if self.gimbal_fsm.state == "mimic":
@@ -178,7 +186,7 @@ class Control:
             self.command_queue: string type command for the light arrays
                 format: "(theta, phi), (R, G, B)"
         """
-        d_posture, buttons = (0.0, 0.0), (0, 0, 0)
+        d_posture, buttons = (0.0, 0.0), (0, 0, 0,0)
         posture_cache = [(0, 0)]
         while True:
             # ============  get posture data from joystick
