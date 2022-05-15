@@ -1,8 +1,11 @@
 import glob
 import os
+import time
 
 from mutagen.mp3 import MP3
 import pygame
+
+from music_analyzer import MusicAnalyzer
 
 
 # pygame.mixer.music.load()  ——  载入一个音乐文件用于播放
@@ -34,7 +37,7 @@ class MusicPlayer:
             pygame.mixer.music.queue(i)
 
         self._update_music_info()
-        self.music_analyzer.gen_color_seq(f_path=self.music_files[self.cur_music_idx])
+        # self.gen_color_seq()
 
         self.volume = 0.8
         self.status = "stop"    # stop, play, pause
@@ -57,14 +60,17 @@ class MusicPlayer:
 
         self.components = {
             "root_window": pygame.Rect(0, 0, 800, 600),
-            "play_bt": Button(self.surfaces["play_bt"], name="play_bt", size=(80, 80), pos=(430, 460)),
-            "next_bt": Button(self.surfaces["next_bt"], name="next_bt", size=(80, 80), pos=(570, 460)),
-            "stop_bt": Button(self.surfaces["stop_bt"], name="stop_bt", size=(80, 80), pos=(290, 460)),
-            "prev_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(150, 460)),
-            "p_bar": ProgressBar(self.surfaces["circle"], name="p_bar", size=(30, 30), pos=(100, 430), length=600,
-                                 src=(100, 430), dst=(700, 430), height=2, line_color=(0, 100, 100)),
-            "text_lst": TextList(None, name="text_lst", size=(500, 250), pos=(150, 90), num=5, spacing=10,
-                                 margin=(5, 5, 5, 5), font=None, font_size=35, color=(58, 75, 91), bg_color=None)
+            "next_bt": Button(self.surfaces["next_bt"], name="next_bt", size=(80, 80), pos=(570, 490)),
+            "play_bt": Button(self.surfaces["play_bt"], name="play_bt", size=(80, 80), pos=(465, 490)),
+            "stop_bt": Button(self.surfaces["stop_bt"], name="stop_bt", size=(80, 80), pos=(360, 490)),
+            "prev_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(255, 490)),
+            "refresh_bt": Button(self.surfaces["prev_bt"], name="prev_bt", size=(80, 80), pos=(150, 490)),
+            "p_bar": ProgressBar(self.surfaces["circle"], name="p_bar", size=(30, 30), pos=(100, 470), length=600,
+                                 src=(100, 470), dst=(700, 470), height=2, line_color=(0, 100, 100)),
+            "text_lst": TextList(None, name="text_lst", size=(500, 250), pos=(130, 80), num=5, spacing=10,
+                                 margin=(5, 5, 5, 5), font=None, font_size=35, color=(58, 75, 91), bg_color=None),
+            "msg_box": TextBox(None, name="msg_box", size=(300, 40), pos=(135, 390), text="", font=None,
+                               font_size=35, color=(76, 88, 94), bg_color=None)
         }
 
         self.screen = None
@@ -72,13 +78,14 @@ class MusicPlayer:
 
         self.running = False
 
-    def play(self, idx=-1, start=0.0, preload=False):
+    def play(self, idx=-1, start=0.0, preload=False, pregen=True):
         pygame.mixer.music.stop()
         if idx >= 0:
             self.cur_music_idx = idx
         self.cur_music_pos = start
-        # pygame.mixer.music.set_pos(self.cur_music_pos)
-        self.music_analyzer.gen_color_seq(self.music_files[self.cur_music_idx])
+        if pregen:
+            self.gen_color_seq()
+        # self.music_analyzer.gen_color_seq(self.music_files[self.cur_music_idx])
         pygame.mixer.music.load(self.music_files[self.cur_music_idx])
         self._update_music_info()
         if not preload:
@@ -110,7 +117,7 @@ class MusicPlayer:
     def next_music(self):
         self.status = "stop"
         self.cur_music_idx = (self.cur_music_idx + 1) % len(self.music_files)
-        self.play(preload=True)
+        self.play(preload=True, pregen=False)
         if self.cur_music_idx >= self.cursor + len(self.components["text_lst"]):
             self.cursor = self.cur_music_idx - len(self.components["text_lst"]) + 1
         if self.cur_music_idx == 0:
@@ -119,7 +126,7 @@ class MusicPlayer:
     def prev_music(self):
         self.status = "stop"
         self.cur_music_idx = (self.cur_music_idx - 1) % len(self.music_files)
-        self.play(preload=True)
+        self.play(preload=True, pregen=False)
         if self.cur_music_idx < self.cursor:
             self.cursor = self.cur_music_idx
         if self.cur_music_idx == len(self.music_files) - 1:
@@ -156,8 +163,20 @@ class MusicPlayer:
             self.cur_music_idx = 0
             self.cur_music_pos = 0.0  # in sec
 
-    def get_color(self):
-        return self.music_analyzer.get_color(self.cur_music_pos)
+    def get_color(self, code="rgb"):
+        return self.music_analyzer.get_color(self.cur_music_pos, code=code)
+
+    def gen_color_seq(self):
+        self.pop_msg("Analyzing...")
+        self.music_analyzer.gen_color_seq(f_path=self.music_files[self.cur_music_idx])
+        self.pop_msg("Done")
+        time.sleep(0.2)
+        self.pop_msg("")
+
+    def pop_msg(self, msg):
+        self.components["msg_box"].set_text(self.screen, msg)
+        self.components["msg_box"].display(self.screen)
+        pygame.display.update()
 
     def run(self):
         pygame.init()
@@ -191,6 +210,7 @@ class MusicPlayer:
             self.components["prev_bt"].display(self.screen)
             self.components["stop_bt"].display(self.screen)
             self.components["text_lst"].display(self.screen)
+            self.components["msg_box"].display(self.screen)
 
             if self.get_busy():
                 self.components["play_bt"].set_surface(self.surfaces["pause_bt"])
@@ -236,7 +256,7 @@ class MusicPlayer:
                         elif self.status == "pause":
                             self.unpause()
                         elif self.status == "stop":
-                            self.rewind()
+                            self.play()
                     elif self.components["next_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
                         self.next_music()
                     elif self.components["prev_bt"].check_hover(mouse_x, mouse_y) and event.button == 1:
@@ -379,5 +399,6 @@ class TextList(BaseControl):
             self.text_list[i].display(screen)
 
 if __name__ == "__main__":
-    music_player = MusicPlayer(r"D:\ECE445Project\central_server\music")
+    manalyzer = MusicAnalyzer()
+    music_player = MusicPlayer(r"D:\ECE445Project\central_server\music", manalyzer)
     music_player.run()
