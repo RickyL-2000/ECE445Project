@@ -267,13 +267,10 @@ class MusicPlayerGUI:
                     pygame.quit()
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RIGHT:
-                        print("K_RIGHT")
                         self.next_music()
                     if event.key == pygame.K_LEFT:
-                        print("K_LEFT")
                         self.prev_music()
                     if event.key == pygame.K_SPACE:
-                        print("K_SPACE")
                         if self.status == "pause":
                             self.unpause()
                         elif self.get_busy():
@@ -281,11 +278,9 @@ class MusicPlayerGUI:
                         else:
                             self.play(self.cur_music_idx)
                     if event.key == pygame.K_UP:
-                        print("K_UP")
                         self.volume += 0.1
                         self.set_volume(self.volume)
                     if event.key == pygame.K_DOWN:
-                        print("K_DOWN")
                         self.volume -= 0.1
                         self.set_volume(self.volume)
                 if event.type == pygame.MOUSEBUTTONDOWN:

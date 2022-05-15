@@ -25,7 +25,7 @@ class Dynamics:
 
         # self.joystick_queue = Queue(10)
         self.joystick_lock = Lock()
-        self._joystick_data = ((0, 0), (0, 0, 0))
+        self._joystick_data = ((0, 0), (0, 0, 0,0))
         self.updated = False
         self.last_buffer_len = 20
         self.last_pitch = [0] * self.last_buffer_len
@@ -48,12 +48,12 @@ class Dynamics:
         self.joystick_lock.release()
 
     def recv(self, msg):
-        pitch, roll, move, color, record, play = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}, {:d}", msg)
+        pitch, roll, move, color, record,play = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}, {:d}", msg)
 
         pitch, roll = Dynamics.spatial_remap(pitch, roll)
         pitch, roll = self.temporal_remap(pitch, roll)
 
-        data = ((pitch, roll), (move, color, record))  # (posture,buttons)
+        data = ((pitch, roll), (move, color, record,play))  # (posture,buttons)
 
         self.joystick_data = data
 
