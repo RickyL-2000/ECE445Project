@@ -48,7 +48,7 @@ class Dynamics:
         self.joystick_lock.release()
 
     def recv(self, msg):
-        pitch, roll, move, color, record = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}", msg)
+        pitch, roll, move, color, record, play = parse.parse("{:f}, {:f}, {:d}, {:d}, {:d}, {:d}", msg)
 
         pitch, roll = Dynamics.spatial_remap(pitch, roll)
         pitch, roll = self.temporal_remap(pitch, roll)

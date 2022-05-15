@@ -8,8 +8,7 @@ from transitions import Machine
 import math
 from utils.channel import Channel
 from utils.circular_queue import CircularQueue
-from dynamics import PITCH_REMAP,ROLL_REMAP
-
+from dynamics import PITCH_REMAP, ROLL_REMAP
 
 PERIOD = 0.009  # s
 
@@ -49,11 +48,11 @@ class RandomGenerator:
     def __init__(self):
         self.random_seed = 12345
 
-    def random_posture(self,hsv):
-        h,s,v = hsv
-        return math.cos(h/180*math.pi) * PITCH_REMAP, math.sin(h/180*math.pi) * ROLL_REMAP
+    def random_posture(self, hsv):
+        h, s, v = hsv
+        return math.cos(h / 180 * math.pi) * PITCH_REMAP, math.sin(h / 180 * math.pi) * ROLL_REMAP
 
-    def random_color(self,hsv):
+    def random_color(self, hsv):
         return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
 
 
@@ -115,7 +114,7 @@ class Control:
         self.cur_command_lock.release()
 
     def __repr__(self):
-        return f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, command_len:{self.command_queue.qsize()}, record_len:{len(self.record_buffer)} command:{self.cur_command}"
+        return f"{time.time():.3f} | gimbal:{self.gimbal_fsm.state}, record_len:{len(self.record_buffer)} command:{self.cur_command}"
 
     def connect_lights(self, light_id, light_config):
         self.light_connections[light_id] = Channel(light_id).becomeClient(light_config["host"], light_config["port"])
@@ -136,10 +135,11 @@ class Control:
             self.gimbal_fsm.trigger("record_button_change")
             if self.gimbal_fsm.is_record():
                 self.record_buffer = []
+                self.repeat_count = 0
 
         self.last_button_state = (move, color, record)
 
-    def filter(self, dynamics_posture, music_analysis_color,hsv):
+    def filter(self, dynamics_posture, music_analysis_color, hsv):
         if self.gimbal_fsm.state == "mimic":
             filtered_posture = dynamics_posture
         elif self.gimbal_fsm.state == "record":
@@ -150,8 +150,11 @@ class Control:
             filtered_posture = self.random_gene.random_posture(hsv)
         elif self.gimbal_fsm.state == "repeat":
             # take a recorded command from buffer, than restore it.
-            filtered_posture = self.record_buffer[self.repeat_count]
-            self.repeat_count = (self.repeat_count + 1) % len(self.record_buffer)
+            try:
+                filtered_posture = self.record_buffer[self.repeat_count]
+                self.repeat_count = (self.repeat_count + 1) % len(self.record_buffer)
+            except IndexError:
+                filtered_posture = (0, 0)
         else:
             raise Exception("Unknown state for gimbal FSM")
 
@@ -187,13 +190,14 @@ class Control:
                 # print(f"recv from dynamics {d_posture}")
 
             # ============  get color data from music analysis subsystem, according the play states
-            m_color, hsv = self.music_player.get_color("both")
             if self.music_player.get_busy():
+                m_color, hsv = self.music_player.get_color("both")
                 # pure green indicates no music is playing
-                m_color = (0, 255, 0)
+            else:
+                m_color, hsv = (0, 255, 0), (0, 0, 0)
 
             self.button_trigger(buttons)
-            posture_command, color_command = self.filter(d_posture, m_color,hsv)
+            posture_command, color_command = self.filter(d_posture, m_color, hsv)
             # color_command = []
             self.cur_command = f"{posture_command[0]:.2f}, {posture_command[1]:.2f}, {color_command[0]}, {color_command[1]}, {color_command[2]}"
             # self.cur_command = f"{', '.join([f'{x:.2f}' for x in posture_command])}, {', '.join([f'{x}' for x in color_command])}"
@@ -235,9 +239,9 @@ class Control:
         player_t = Thread(target=self.music_player.run, daemon=True)
         monitor_t = Thread(target=self.monitor, daemon=True)
 
+        player_t.start()
         recv_t.start()
         send_t.start()
-        player_t.start()
         # monitor_t.start()
 
         recv_t.join()

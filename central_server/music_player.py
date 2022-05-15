@@ -29,7 +29,46 @@ class MusicPlayer:
         pygame.mixer.init()
         self.music_dir = music_dir
         self.music_analyzer = music_analyzer
-        self.music_files = glob.glob(f'{music_dir}/*.mp3')
+        self.music_files = glob.glob(f'{music_dir}/*')
+        self.cur_music_idx = 0
+        self.cur_music_pos = 0.0    # in sec
+        pygame.mixer.music.load(self.music_files[self.cur_music_idx])
+
+    def play(self, start=0.0):
+        pygame.mixer.music.stop()
+        self.cur_music_pos = start
+        pygame.mixer.music.load(self.music_files[self.cur_music_idx])
+        pygame.mixer.music.play(start=start)
+
+    def pause(self):
+        pygame.mixer.music.pause()
+
+    def unpause(self):
+        pygame.mixer.music.unpause()
+
+    def stop(self):
+        self.cur_music_pos = 0.0
+        pygame.mixer.music.stop()
+
+    def get_busy(self):
+        return pygame.mixer.music.get_busy()
+
+    def get_color(self, code="rgb"):
+        """code: rgb/RGB / hsv/HSV """
+        return self.music_analyzer.get_color(self.cur_music_pos, code=code)
+
+    def gen_color_seq(self):
+        print("Analyzing...")
+        self.music_analyzer.gen_color_seq(f_path=self.music_files[self.cur_music_idx])
+        print("Done")
+
+
+class MusicPlayerGUI:
+    def __init__(self, music_dir, music_analyzer):
+        pygame.mixer.init()
+        self.music_dir = music_dir
+        self.music_analyzer = music_analyzer
+        self.music_files = glob.glob(f'{music_dir}/*')
         self.cur_music_idx = 0
         self.cur_music_pos = 0.0    # in sec
         pygame.mixer.music.load(self.music_files[self.cur_music_idx])
@@ -37,7 +76,6 @@ class MusicPlayer:
             pygame.mixer.music.queue(i)
 
         self._update_music_info()
-        # self.gen_color_seq()
 
         self.volume = 0.8
         self.status = "stop"    # stop, play, pause
@@ -187,6 +225,8 @@ class MusicPlayer:
         # show window
         self.surfaces["background"] = pygame.transform.scale(self.surfaces["background"],
                                                              self.components["root_window"].size)
+
+        self.gen_color_seq()
 
         self.running = True
         while self.running:
