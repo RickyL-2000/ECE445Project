@@ -191,11 +191,6 @@ void servo_pitch_task(void *pvParameters) {
     auto *commandQueues = (commandQueues_t *) pvParameters;
 
     float pitch;
-    float sum_pitch = 0.0;
-//    const float lambda = 0.2;
-    const int k_size = 20;
-    int index = 0;
-    float pitch_lst[k_size] = {0};
 
     Servo servo_pitch(D270, SERVO_PITCH_GPIO,
                       MCPWM_UNIT_0, MCPWM0A, MCPWM_TIMER_0, MCPWM_OPR_A);
@@ -203,10 +198,32 @@ void servo_pitch_task(void *pvParameters) {
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
+
+    // for (;;) {
+        /* zero */
+        // ESP_ERROR_CHECK(servo_pitch.set_angle(0));
+        // vTaskDelay(pdMS_TO_TICKS(500));
+        // for (int i = -135; i < 135; i += 10) {
+        //     pitch = (float) i;
+        //     ESP_LOGI(TAG, "%.2f ", pitch);
+        //     ESP_ERROR_CHECK(servo_pitch.set_angle(pitch));
+        //     vTaskDelay(pdMS_TO_TICKS(500));
+        // }
+        // for (int i = 135; i > -135; i -= 10) {
+        //     pitch = (float) i;
+        //     ESP_LOGI(TAG, "%.2f ", pitch);
+        //     ESP_ERROR_CHECK(servo_pitch.set_angle(pitch));
+        //     vTaskDelay(pdMS_TO_TICKS(500));
+        // }
+        // vTaskDelayUntil(&xLastWakeTime, 2*xPeriodTicks);
+    // }
+
     for (;;) {
         if (xQueueReceive(commandQueues->pitchQueue, &pitch, 0) == pdTRUE) {
 
             ESP_LOGI(TAG, "%.2f ", pitch);
+            // filter
+            if (abs(pitch) > 120) pitch = 120 * abs(pitch) / pitch;
             ESP_ERROR_CHECK(servo_pitch.set_angle(pitch));
         }
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
@@ -219,11 +236,6 @@ void servo_yaw_task(void *pvParameters) {
     auto *commandQueues = (commandQueues_t *) pvParameters;
 
     float yaw;
-    float sum_yaw = 0.0;
-//    const float lambda = 0.2;
-    const int k_size = 20;
-    int index = 0;
-    float yaw_lst[k_size] = {0};
 
     Servo servo_yaw(D360, SERVO_YAW_GPIO,
                     MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
@@ -293,7 +305,7 @@ extern "C" void app_main() {
     TaskHandle_t tcp_server_handle;
     xTaskCreate(tcp_server_task, "tcp_server", 4096,
                 tcpServerTaskParameters, 5, &tcp_server_handle);
-
+    
     TaskHandle_t led_control_handle;
     xTaskCreate(led_control_task, "led_control", 4096,
                 commandQueues_p, 2, &led_control_handle);
