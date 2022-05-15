@@ -1,4 +1,5 @@
 import queue
+import os
 
 import torch
 from torch import package
@@ -14,8 +15,11 @@ class MusicAnalyzer:
         imp = package.PackageImporter("model.pt")
         self.recognizer = imp.load_pickle("emotion_recog", "model.pt")
 
-        self.color_queue = queue.Queue(-1)
+        # self.color_queue = queue.Queue(-1)
+        self.color_seq = []
         self.sr = 0.0
+
+        self.cache = {}
 
     def emotion_recog(self, mel, channel=80):
         mel = mel[:channel, :]
@@ -41,7 +45,14 @@ class MusicAnalyzer:
         The music loading takes most of the time
         """
         print("Start analyzing...")
-        self.color_queue = queue.Queue(-1)
+
+        if os.path.basename(f_path) in self.cache:
+            print("Load from cache...")
+            self.color_seq = self.cache[os.path.basename(f_path)]
+            print("Analysis done.")
+            return
+
+        self.color_seq = []
 
         y, fs = load_audio(f_path)
         hue_map = np.zeros(math.ceil(len(y)/hop_length))
@@ -90,6 +101,12 @@ class MusicAnalyzer:
         r, g, b = hsv2rgb(hue_map, saturation_map, value_map)
 
         for R, G, B, t in zip(r, g, b, times):
-            self.color_queue.put(((int(R), int(G), int(B)), t))
+            self.color_seq.append(((int(R), int(G), int(B)), t))
+
+        self.cache[os.path.basename(f_path)] = self.color_seq
 
         print("Analysis done.")
+
+    def get_color(self, music_pos):
+        # music_pos: in sec
+        return self.color_seq[int(music_pos * self.sr)]

@@ -22,9 +22,10 @@ import pygame
 # pygame.mixer.music.get_endevent()  ——  获取播放结束时发送的事件
 
 class MusicPlayer:
-    def __init__(self, music_dir):
+    def __init__(self, music_dir, music_analyzer):
         pygame.mixer.init()
         self.music_dir = music_dir
+        self.music_analyzer = music_analyzer
         self.music_files = glob.glob(f'{music_dir}/*.mp3')
         self.cur_music_idx = 0
         self.cur_music_pos = 0.0    # in sec
@@ -33,6 +34,7 @@ class MusicPlayer:
             pygame.mixer.music.queue(i)
 
         self._update_music_info()
+        self.music_analyzer.gen_color_seq(f_path=self.music_files[self.cur_music_idx])
 
         self.volume = 0.8
         self.status = "stop"    # stop, play, pause
@@ -70,13 +72,17 @@ class MusicPlayer:
 
         self.running = False
 
-    def play(self, idx=-1, start=0.0):
+    def play(self, idx=-1, start=0.0, preload=False):
         pygame.mixer.music.stop()
         if idx >= 0:
             self.cur_music_idx = idx
+        self.cur_music_pos = start
+        # pygame.mixer.music.set_pos(self.cur_music_pos)
+        self.music_analyzer.gen_color_seq(self.music_files[self.cur_music_idx])
         pygame.mixer.music.load(self.music_files[self.cur_music_idx])
         self._update_music_info()
-        pygame.mixer.music.play(start=start)
+        if not preload:
+            pygame.mixer.music.play(start=start)
 
     def pause(self):
         self.status = "pause"
@@ -102,16 +108,18 @@ class MusicPlayer:
         pygame.mixer.music.play(self.cur_music_idx)
 
     def next_music(self):
+        self.status = "stop"
         self.cur_music_idx = (self.cur_music_idx + 1) % len(self.music_files)
-        self.play()
+        self.play(preload=True)
         if self.cur_music_idx >= self.cursor + len(self.components["text_lst"]):
             self.cursor = self.cur_music_idx - len(self.components["text_lst"]) + 1
         if self.cur_music_idx == 0:
             self.cursor = 0
 
     def prev_music(self):
+        self.status = "stop"
         self.cur_music_idx = (self.cur_music_idx - 1) % len(self.music_files)
-        self.play()
+        self.play(preload=True)
         if self.cur_music_idx < self.cursor:
             self.cursor = self.cur_music_idx
         if self.cur_music_idx == len(self.music_files) - 1:
@@ -138,12 +146,18 @@ class MusicPlayer:
                 pygame.mixer.music.load(self.music_files[self.cur_music_idx])
             elif cur_music_idx >= 0:
                 self.cur_music_idx = cur_music_idx
-            for i in self.music_files:
-                pygame.mixer.music.queue(i)
+            for file in self.music_files:
+                # TODO: this may need a lock
+                if os.path.exists(file):
+                    # print(file)
+                    pygame.mixer.music.queue(file)
         else:
             self.stop()
             self.cur_music_idx = 0
             self.cur_music_pos = 0.0  # in sec
+
+    def get_color(self):
+        return self.music_analyzer.get_color(self.cur_music_pos)
 
     def run(self):
         pygame.init()
