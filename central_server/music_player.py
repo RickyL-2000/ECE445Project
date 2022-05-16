@@ -230,7 +230,7 @@ class MusicPlayerGUI:
         self.surfaces["background"] = pygame.transform.scale(self.surfaces["background"],
                                                              self.components["root_window"].size)
 
-        self.gen_color_seq()
+        # self.gen_color_seq()
 
         self.running = True
         while self.running:
@@ -440,5 +440,5 @@ class TextList(BaseControl):
 
 if __name__ == "__main__":
     manalyzer = MusicAnalyzer()
-    music_player = MusicPlayer(r"D:\ECE445Project\central_server\music", manalyzer)
+    music_player = MusicPlayerGUI(r"D:\ECE445Project\central_server\music", manalyzer)
     music_player.run()
