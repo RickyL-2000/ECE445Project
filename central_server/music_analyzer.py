@@ -87,8 +87,8 @@ class MusicAnalyzer:
 
         # ----- color map ----- #
         # hue
-        hue_map += energy + 0.6 * beat_soft
-        hue_map = np.convolve(hue_map, np.ones(16) / 16, mode='same')  # filter
+        hue_map += energy + 1.0 * beat_soft
+        hue_map = np.convolve(hue_map, np.ones(8) / 8, mode='same')  # filter
         hue_map /= np.max(hue_map)
         hue_map = hue_map * 240 + emotion * 90
         # hue_map *= 135 + emotion * 90   # centered at four quadrant, which is determined by the emotion
@@ -97,7 +97,7 @@ class MusicAnalyzer:
         # saturation
         saturation_map += energy + 0.5 * beat_soft
         saturation_map = saturation_map / np.max(saturation_map) * 0.8 + 0.2    # not too unsaturated
-        saturation_map = np.convolve(saturation_map, np.ones(32) / 32, mode='same')  # filter
+        saturation_map = np.convolve(saturation_map, np.ones(16) / 16, mode='same')  # filter
 
         # value
         value_map += energy + 0.6 * beat_soft
