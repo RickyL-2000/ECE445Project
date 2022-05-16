@@ -59,12 +59,12 @@ class MusicAnalyzer:
 
         print(f"loading...{os.path.basename(f_path)}")
         y, fs = load_audio(f_path)
-        hue_map = np.zeros(math.ceil(len(y) / hop_length))
+        hue_map = np.zeros(math.ceil(len(y)/hop_length))
         saturation_map = np.zeros_like(hue_map)
         value_map = np.zeros_like(hue_map)
-        times = librosa.times_like(hue_map, sr=fs, hop_length=hop_length)  # timestamp sequence
+        times = librosa.times_like(hue_map, sr=fs, hop_length=hop_length)   # timestamp sequence
         self.sr = fs / hop_length
-        print("load done")
+        print("loading done")
 
         # ----- tempo and beats ----- #
         onset_env = librosa.onset.onset_strength(y, fs, aggregate=np.median)
@@ -77,7 +77,7 @@ class MusicAnalyzer:
 
         # ----- energy ----- #
         energy = librosa.feature.rms(y, frame_length=win_length, hop_length=hop_length)[0]
-        energy /= np.max(energy)  # normalize energy
+        energy /= np.max(energy)    # normalize energy
 
         # ----- emotion ----- #
         # the param of mel is determined by the training of neural net
@@ -88,20 +88,21 @@ class MusicAnalyzer:
         # ----- color map ----- #
         # hue
         hue_map += energy + 0.6 * beat_soft
-        hue_map = np.convolve(hue_map, np.ones(32) / 32, mode='same')  # filter
+        hue_map = np.convolve(hue_map, np.ones(16) / 16, mode='same')  # filter
         hue_map /= np.max(hue_map)
-        hue_map *= 135 + emotion * 90  # centered at four quadrant, which is determined by the emotion
+        hue_map = hue_map * 240 + emotion * 90
+        # hue_map *= 135 + emotion * 90   # centered at four quadrant, which is determined by the emotion
         hue_map = (hue_map + 360) % 360
 
         # saturation
-        saturation_map += energy + 0.1 * beat_soft
-        saturation_map = saturation_map / np.max(saturation_map) * 0.6 + 0.4  # not too unsaturated
-        saturation_map = np.convolve(saturation_map, np.ones(64) / 64, mode='same')  # filter
+        saturation_map += energy + 0.5 * beat_soft
+        saturation_map = saturation_map / np.max(saturation_map) * 0.8 + 0.2    # not too unsaturated
+        saturation_map = np.convolve(saturation_map, np.ones(32) / 32, mode='same')  # filter
 
         # value
-        value_map += energy + 0.3 * beat_soft
-        value_map = value_map / np.max(value_map) * 0.4 + 0.6  # not too dim
-        value_map = np.convolve(value_map, np.ones(32) / 32, mode='same')  # filter
+        value_map += energy + 0.6 * beat_soft
+        value_map = value_map / np.max(value_map) * 0.6 + 0.4   # not too dim
+        value_map = np.convolve(value_map, np.ones(8) / 8, mode='same')  # filter
 
         r, g, b = hsv2rgb(hue_map, saturation_map, value_map)
 
@@ -116,5 +117,4 @@ class MusicAnalyzer:
             return self.rgb_seq[int(music_pos * self.sr)], \
                    self.hsv_seq[int(music_pos * self.sr)]
         else:
-            # print(e)
             return (0, 0, 0), (0, 0, 0)

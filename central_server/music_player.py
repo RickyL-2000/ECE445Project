@@ -42,7 +42,7 @@ class MusicPlayer:
         pygame.mixer.music.stop()
         self.cur_music_pos = start
         pygame.mixer.music.load(self.music_files[self.cur_music_idx])
-        pygame.mixer.music.play(start=start)
+        pygame.mixer.music.play(loops=10, start=start)
 
     def pause(self):
         pygame.mixer.music.pause()

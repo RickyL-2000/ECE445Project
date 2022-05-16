@@ -12,7 +12,7 @@ mplayer = MusicPlayer(r"D:\NextcloudRoot\course\ECE445\ECE445Project\central_ser
 mplayer.gen_color_seq()
 
 light_config = {"lightB":
-                    {"host": LIGHT_MOCK,
+                    {"host": LIGHT_1,
                      "port": LIGHT_PORT},
                 }
 
