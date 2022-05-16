@@ -53,7 +53,9 @@ class RandomGenerator:
         return math.cos(h / 180 * math.pi) * PITCH_REMAP, math.sin(h / 180 * math.pi) * ROLL_REMAP
 
     def random_color(self, hsv):
-        return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
+        h, s, v = hsv
+        return int(h),int(s*255),int(v*255)
+        # return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
 
 
 class Control:

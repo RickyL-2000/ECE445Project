@@ -56,7 +56,7 @@ class Dynamics:
         pitch, roll = Dynamics.spatial_remap(pitch, roll)
         pitch, roll = self.temporal_remap(pitch, roll)
 
-        data = ((pitch, roll), (move, color, record,play))  # (posture,buttons)
+        data = ((-pitch, roll), (move, color, record,play))  # (posture,buttons)
 
         self.joystick_data = data
 
