@@ -33,7 +33,7 @@ typedef struct ledCommend_t {
 typedef struct commandQueues_t {
     QueueHandle_t ledQueue;
     QueueHandle_t pitchQueue;
-    QueueHandle_t yawQueue;
+    QueueHandle_t rollQueue;
 } commandQueues_t;
 
 typedef struct tcpServerTaskParameters_t {
@@ -117,12 +117,12 @@ void tcp_server_task(void *pvParameters) {
                 }
                 sscanf(output_buffer, "%f, %f, %u, %u, %u", &pitch, &roll, &(ledCommend.R), &(ledCommend.G),
                        &(ledCommend.B));
-//                ESP_LOGI(TAG, "%f, %f, %u, %u, %u", pitch, roll, (ledCommend.R), (ledCommend.G),
-//                         (ledCommend.B));
+                ESP_LOGI(TAG, "%f, %f, %u, %u, %u", pitch, roll, (ledCommend.R), (ledCommend.G),
+                         (ledCommend.B));
 
                 // queue send will copy the content of the given pointer. So the buffer can be dynamically allocated.
                 xQueueSend((parameters->commandQueues_p)->pitchQueue, &pitch, 0);
-                xQueueSend((parameters->commandQueues_p)->yawQueue, &roll, 0);
+                xQueueSend((parameters->commandQueues_p)->rollQueue, &roll, 0);
                 xQueueSend((parameters->commandQueues_p)->ledQueue, &ledCommend, 0);
 
             }
@@ -145,7 +145,7 @@ void dummy_control_task(void *pvParameters) {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        xQueuePeek(commandQueues->yawQueue, &roll, 0);
+        xQueuePeek(commandQueues->rollQueue, &roll, 0);
         xQueuePeek(commandQueues->pitchQueue, &pitch, 0);
         xQueuePeek(commandQueues->ledQueue, &ledCommend, 0);
         ESP_LOGI(TAG, "receive from command queue: %.2f, %.2f, %u,%u,%u", pitch, roll, ledCommend.R, ledCommend.G,
@@ -221,7 +221,7 @@ void servo_pitch_task(void *pvParameters) {
     for (;;) {
         if (xQueueReceive(commandQueues->pitchQueue, &pitch, 0) == pdTRUE) {
 
-            ESP_LOGI(TAG, "%.2f ", pitch);
+//            ESP_LOGI(TAG, "%.2f ", pitch);
             // filter
             if (abs(pitch) > 120) pitch = 120 * abs(pitch) / pitch;
             ESP_ERROR_CHECK(servo_pitch.set_angle(pitch));
@@ -231,21 +231,22 @@ void servo_pitch_task(void *pvParameters) {
     vTaskDelete(nullptr);
 }
 
-void servo_yaw_task(void *pvParameters) {
-    static char TAG[] = "servo_yaw_task";
+void servo_roll_task(void *pvParameters) {
+    static char TAG[] = "servo_roll_task";
     auto *commandQueues = (commandQueues_t *) pvParameters;
 
-    float yaw;
+    float roll;
 
-    Servo servo_yaw(D360, SERVO_YAW_GPIO,
+    Servo servo_roll(D360, SERVO_YAW_GPIO,
                     MCPWM_UNIT_0, MCPWM0B, MCPWM_TIMER_0, MCPWM_OPR_B);
 
     const TickType_t xPeriodTicks = 10 / portTICK_PERIOD_MS;
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     for (;;) {
-        if (xQueueReceive(commandQueues->yawQueue, &yaw, 0) == pdTRUE) {
-            ESP_ERROR_CHECK(servo_yaw.set_angle(yaw));
+        if (xQueueReceive(commandQueues->rollQueue, &roll, 0) == pdTRUE) {
+            ESP_ERROR_CHECK(servo_roll.set_angle(roll));
+//            ESP_LOGI(TAG, "%.2f ", roll);
         }
         vTaskDelayUntil(&xLastWakeTime, xPeriodTicks);
     }
@@ -289,7 +290,7 @@ extern "C" void app_main() {
     // from tcp server to the command queue
     auto *commandQueues_p = (commandQueues_t *) malloc(sizeof(commandQueues_t));
     commandQueues_p->pitchQueue = xQueueCreate(10, sizeof(float));
-    commandQueues_p->yawQueue = xQueueCreate(10, sizeof(float));
+    commandQueues_p->rollQueue = xQueueCreate(10, sizeof(float));
     commandQueues_p->ledQueue = xQueueCreate(10, sizeof(ledCommend_t));
 
 
@@ -313,11 +314,11 @@ extern "C" void app_main() {
     TaskHandle_t servo_pitch_handle;
     xTaskCreate(servo_pitch_task, "servo_pitch", 4096,
                 commandQueues_p, 2, &servo_pitch_handle);
-//
-//    TaskHandle_t servo_yaw_handle;
-//    xTaskCreate(servo_yaw_task, "servo_yaw", 4096,
-//                commandQueues_p, 2, &servo_yaw_handle);
-////
+
+    TaskHandle_t servo_roll_handle;
+    xTaskCreate(servo_roll_task, "servo_roll", 4096,
+                commandQueues_p, 2, &servo_roll_handle);
+
 //    TaskHandle_t dummy_control_handle;
 //    xTaskCreate(dummy_control_task, "dummy_control", 4096,
 //                commandQueues_p, 2, &dummy_control_handle);
