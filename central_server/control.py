@@ -27,7 +27,7 @@ class Gimbal:
 
     def __init__(self) -> None:
         self.machine = Machine(
-                model=self, states=Gimbal.states, transitions=Gimbal.transitions, initial='random',
+                model=self, states=Gimbal.states, transitions=Gimbal.transitions, initial='mimic',
                 ignore_invalid_triggers=True)
 
 

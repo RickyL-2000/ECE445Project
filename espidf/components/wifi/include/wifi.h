@@ -11,10 +11,10 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-//#define EXAMPLE_ESP_WIFI_SSID      "RICKY"
-//#define EXAMPLE_ESP_WIFI_PASS      "RICKY2000"
-#define EXAMPLE_ESP_WIFI_SSID      "nichousha"
-#define EXAMPLE_ESP_WIFI_PASS      "chounizadi"
+#define EXAMPLE_ESP_WIFI_SSID      "RICKY"
+#define EXAMPLE_ESP_WIFI_PASS      "RICKY2000"
+//#define EXAMPLE_ESP_WIFI_SSID      "nichousha"
+//#define EXAMPLE_ESP_WIFI_PASS      "chounizadi"
 //#define EXAMPLE_ESP_WIFI_SSID      "HAOZHE-Mi10S"
 //#define EXAMPLE_ESP_WIFI_PASS      "411411411"
 #define EXAMPLE_ESP_MAXIMUM_RETRY  5

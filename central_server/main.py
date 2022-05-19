@@ -1,6 +1,6 @@
 from control import Control
 from dynamics import Dynamics
-from utils.config import LIGHT_MOCK, LIGHT_PORT, LIGHT_1
+from utils.config import LIGHT_MOCK, LIGHT_PORT, LIGHT_1, BOARDCAST_IP
 from music_player import MusicPlayer
 from music_analyzer import MusicAnalyzer
 import warnings
@@ -16,7 +16,7 @@ with warnings.catch_warnings():
     mplayer.gen_color_seq()
 
     light_config = {"lightB":
-                        {"host":LIGHT_1,
+                        {"host":LIGHT_MOCK,
                          "port":LIGHT_PORT},
                     }
 
