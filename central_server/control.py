@@ -50,7 +50,12 @@ class RandomGenerator:
 
     def random_posture(self, hsv):
         h, s, v = hsv
-        return math.cos(h / 180 * math.pi) * PITCH_REMAP, math.sin(h / 180 * math.pi) * ROLL_REMAP
+
+        # self.last_h = sum()
+        # h = self.last_h
+
+        return math.cos(h / 180 * math.pi) * PITCH_REMAP*0.8, math.sin(h / 180 * math.pi) * ROLL_REMAP*0.8
+
 
     def random_color(self, hsv):
         h, s, v = hsv

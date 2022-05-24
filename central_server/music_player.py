@@ -4,6 +4,7 @@ import time
 
 from mutagen.mp3 import MP3
 import pygame
+from mutagen.mp3 import MP3
 
 from music_analyzer import MusicAnalyzer
 
@@ -32,9 +33,11 @@ class MusicPlayer:
         self.music_files = glob.glob(f'{music_dir}/*.mp3')
         self.cur_music_idx = 0
         self.cur_music_pos = 0.0    # sec
+        self.cur_music_inf = {}
         # pygame.mixer.music.load(self.music_files[self.cur_music_idx])
         for i in self.music_files:
             pygame.mixer.music.queue(i)
+        self._update_music_info()
         self.play()
         self.pause()
 
@@ -57,9 +60,14 @@ class MusicPlayer:
     def get_busy(self):
         return pygame.mixer.music.get_busy()
 
+    def _update_music_info(self):
+        self.cur_music_info = {
+                "length": MP3(self.music_files[self.cur_music_idx]).info.length  # in sec
+        }
+
     def get_color(self):
         """code: rgb/RGB / hsv/HSV """
-        self.cur_music_pos = pygame.mixer.music.get_pos() / 1000
+        self.cur_music_pos = pygame.mixer.music.get_pos() / 1000 % self.cur_music_info["length"]
         return self.music_analyzer.get_color(self.cur_music_pos)
 
     def gen_color_seq(self):

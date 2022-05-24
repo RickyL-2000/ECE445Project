@@ -17,7 +17,7 @@ static const char *TAG = "light_main";
 
 // parameters for ws2812 control
 #define RMT_TX_CHANNEL RMT_CHANNEL_0
-#define LED_NUMBER 64
+#define LED_NUMBER 16
 static gpio_num_t RMT_TX_GPIO = (gpio_num_t) 25;
 
 // parameters for servo control

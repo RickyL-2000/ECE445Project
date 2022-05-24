@@ -1,5 +1,5 @@
 from utils.channel import Channel
-from utils.config import PC_IP, DYNAMICS_PORT
+from utils.config import PC_IP, DYNAMICS_PORT, BOARDCAST_IP
 from threading import Thread, Lock
 import math
 import parse
