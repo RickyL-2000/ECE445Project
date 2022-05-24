@@ -28,7 +28,7 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
 
     # plot
     plt.figure(figsize=(9, 6))
-    fig, ax = plt.subplots(nrows=3, figsize=(12, 12))
+    fig, ax = plt.subplots(nrows=3, figsize=(9, 10))
     M = librosa.feature.melspectrogram(y=y_, sr=fs, hop_length=hop_length)
     M = librosa.power_to_db(M, ref=np.max)
     librosa.display.specshow(M, y_axis='mel', x_axis='time', hop_length=hop_length, ax=ax[0])
@@ -67,7 +67,7 @@ def plot_beats(y, fs, begin=0, end=10, hop_length=512):
 
     plt.show()
 
-# plot_beats(y, fs, begin=10, end=20, hop_length=512)
+plot_beats(y, fs, begin=10, end=20, hop_length=512)
 
 
 # %%
